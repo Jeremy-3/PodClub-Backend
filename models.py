@@ -5,8 +5,10 @@ import re
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
+# Initialize the database
 db = SQLAlchemy()
 
+# User model
 class User(db.Model, SerializerMixin):
     __tablename__ = 'users'
 
@@ -14,14 +16,12 @@ class User(db.Model, SerializerMixin):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
-    role = db.Column(db.String(20), nullable=False)  
+    role = db.Column(db.String(20), nullable=False)
     is_banned = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
 
     # Relationships
     reports = db.relationship('Report', foreign_keys='Report.user_id', backref='reporter', lazy=True)
-
-    
     channels = db.relationship('Channel', secondary='channel_members', back_populates='members')
 
     # Validations
@@ -50,14 +50,13 @@ class User(db.Model, SerializerMixin):
         return check_password_hash(self.password_hash, password)
 
     def to_dict(self):
-        data = super().to_dict()  
-        data['channels'] = [channel.name for channel in self.channels] 
-        data['reports'] = [report.id for report in self.reports]  
+        data = super().to_dict()
+        data['channels'] = [channel.name for channel in self.channels]
+        data['reports'] = [report.id for report in self.reports]
         return data
 
     # Serialization rules
-    serialize_rules = ('-reports.reporter', '-channels.users')  
-
+    serialize_rules = ('-reports.reporter', '-channels.users')
 
 # Report model
 class Report(db.Model, SerializerMixin):
@@ -82,12 +81,14 @@ class Report(db.Model, SerializerMixin):
         return reason
 
     def to_dict(self):
-        data = super().to_dict()  
-        data['reported_user'] = self.reported_user.username  
+        data = super().to_dict()
+        data['reported_user'] = self.reported_user.username
         return data
 
     # Serialization rules
-    serialize_rules = ('-reported_user.reports_received',)  
+    serialize_rules = ('-reported_user.reports_received',)
+
+# Channel model
 class Channel(db.Model, SerializerMixin):
     __tablename__ = 'channels'
 
@@ -99,10 +100,7 @@ class Channel(db.Model, SerializerMixin):
 
     # Relationships
     owner = db.relationship('User', backref='owned_channels', lazy=True)
-
     members = db.relationship('User', secondary='channel_members', back_populates='channels')
-
-
     messages = db.relationship('Message', backref='channel', lazy=True)
 
     # Validations
@@ -115,14 +113,13 @@ class Channel(db.Model, SerializerMixin):
         return name
 
     def to_dict(self):
-        data = super().to_dict() 
-        data['members'] = [member.username for member in self.members]  
-        data['messages'] = [message.id for message in self.messages]  
+        data = super().to_dict()
+        data['members'] = [member.username for member in self.members]
+        data['messages'] = [message.id for message in self.messages]
         return data
 
     # Serialization rules
-    serialize_rules = ('-owner.owned_channels', '-members.channels')  
-
+    serialize_rules = ('-owner.owned_channels', '-members.channels')
 
 # Association table for Channel-Members
 class ChannelMember(db.Model, SerializerMixin):
@@ -138,7 +135,7 @@ class ChannelMember(db.Model, SerializerMixin):
             'joined_at': self.joined_at.isoformat()
         }
 
-
+# Message model
 class Message(db.Model, SerializerMixin):
     __tablename__ = 'messages'
 
@@ -155,8 +152,8 @@ class Message(db.Model, SerializerMixin):
         return f'<Message {self.content[:20]}>'
 
     def to_dict(self):
-        data = super().to_dict() 
-        data['sender'] = self.sender.username  
+        data = super().to_dict()
+        data['sender'] = self.sender.username
         return data
 
     # Serialization rules
