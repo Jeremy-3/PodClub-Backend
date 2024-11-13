@@ -8,7 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 db = SQLAlchemy()
 
 class User(db.Model, SerializerMixin):
-    _tablename_ = 'users'
+    __tablename__ = 'users'
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -21,7 +21,7 @@ class User(db.Model, SerializerMixin):
     # Relationships
     reports = db.relationship('Report', foreign_keys='Report.user_id', backref='reporter', lazy=True)
 
-
+    
     channels = db.relationship('Channel', secondary='channel_members', back_populates='members')
 
     # Validations
@@ -52,7 +52,7 @@ class User(db.Model, SerializerMixin):
     def to_dict(self):
         data = super().to_dict()  
         data['channels'] = [channel.name for channel in self.channels] 
-        data['reports'] = [report.id for report in self.reports] 
+        data['reports'] = [report.id for report in self.reports]  
         return data
 
     # Serialization rules
@@ -61,7 +61,7 @@ class User(db.Model, SerializerMixin):
 
 # Report model
 class Report(db.Model, SerializerMixin):
-    _tablename_ = 'reports'
+    __tablename__ = 'reports'
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
@@ -89,7 +89,7 @@ class Report(db.Model, SerializerMixin):
     # Serialization rules
     serialize_rules = ('-reported_user.reports_received',)  
 class Channel(db.Model, SerializerMixin):
-    _tablename_ = 'channels'
+    __tablename__ = 'channels'
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -100,10 +100,9 @@ class Channel(db.Model, SerializerMixin):
     # Relationships
     owner = db.relationship('User', backref='owned_channels', lazy=True)
 
-    
     members = db.relationship('User', secondary='channel_members', back_populates='channels')
 
-    
+
     messages = db.relationship('Message', backref='channel', lazy=True)
 
     # Validations
@@ -116,7 +115,7 @@ class Channel(db.Model, SerializerMixin):
         return name
 
     def to_dict(self):
-        data = super().to_dict()  
+        data = super().to_dict() 
         data['members'] = [member.username for member in self.members]  
         data['messages'] = [message.id for message in self.messages]  
         return data
@@ -127,7 +126,7 @@ class Channel(db.Model, SerializerMixin):
 
 # Association table for Channel-Members
 class ChannelMember(db.Model, SerializerMixin):
-    _tablename_ = 'channel_members'
+    __tablename__ = 'channel_members'
     channel_id = db.Column(db.Integer, db.ForeignKey('channels.id'), primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)
     joined_at = db.Column(db.DateTime, default=db.func.current_timestamp())
@@ -141,7 +140,7 @@ class ChannelMember(db.Model, SerializerMixin):
 
 
 class Message(db.Model, SerializerMixin):
-    _tablename_ = 'messages'
+    __tablename__ = 'messages'
 
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.String(1000), nullable=False)
@@ -152,13 +151,13 @@ class Message(db.Model, SerializerMixin):
     # Relationship to sender
     sender = db.relationship('User', backref='messages_sent', lazy=True)
 
-    def _repr_(self):
+    def __repr__(self):
         return f'<Message {self.content[:20]}>'
 
     def to_dict(self):
-        data = super().to_dict()  
+        data = super().to_dict() 
         data['sender'] = self.sender.username  
         return data
 
     # Serialization rules
-    serialize_rules = ('-sender.messages_sent', '-channel.messages') 
+    serialize_rules = ('-sender.messages_sent', '-channel.messages')
