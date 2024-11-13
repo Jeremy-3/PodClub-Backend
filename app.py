@@ -193,7 +193,62 @@ def invite_to_channel(channel_id):
 
     return jsonify({"msg": "Invite sent successfully!"}), 200
 
+@app.route('/accept_invite', methods=['GET'])
+def accept_invite():
+    token = request.args.get('token')
 
+    if not token:
+        return jsonify({"msg": "Missing token!"}), 400
+
+    try:
+        # Decoding the invite token
+        data = jwt.decode(token, app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+        channel_id = data['channel_id']
+        invitee_email = data['invitee_email']
+
+        # Check if the channel exists
+        channel = db.session.query(Channel).get(channel_id)
+        if not channel:
+            return jsonify({"msg": "Channel not found!"}), 404
+
+        # Check if the user is logged in
+        current_user_id = session.get('user_id')
+
+        if not current_user_id:
+            return jsonify({
+                "msg": "You must be logged in to accept this invite.",
+                "login_required": True
+            }), 401
+
+        # Get the user associated with the session
+        current_user = db.session.query(User).get(current_user_id)
+
+        # If the invitee is not registered yet, sign them up
+        if not current_user:
+            # Check if the invitee's email matches the one from the token
+            if current_user_email != invitee_email:
+                return jsonify({"msg": "The email doesn't match the invite!"}), 400
+
+            # Proceed with sign up (this is just an example, you can extract from request)
+            new_user = User(email=invitee_email, username=invitee_email.split('@')[0])
+            new_user.set_password('default_password')  
+            db.session.add(new_user)
+            db.session.commit()
+
+            current_user = new_user
+
+        # Add the current user to the channel
+        if current_user not in channel.members:
+            channel.members.append(current_user)
+            db.session.commit()
+            return jsonify({"msg": "You have successfully joined the channel!"}), 200
+        else:
+            return jsonify({"msg": "You are already a member of this channel!"}), 400
+
+    except jwt.ExpiredSignatureError:
+        return jsonify({"msg": "Invite link expired!"}), 400
+    except jwt.InvalidTokenError:
+        return jsonify({"msg": "Invalid invite token!"}), 400
 
 
 
