@@ -70,3 +70,35 @@ def register():
         return jsonify({"msg": "Error registering user", "error": str(e)}), 500
 
 
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    user = db.session.query(User).filter_by(email=data['email']).first()
+    if user and user.check_password(data['password']):  
+        access_token = create_access_token(identity=user.id)
+        session['user_id'] = user.id
+        return jsonify(access_token=access_token), 200
+    return jsonify({"msg": "Invalid credentials"}), 401
+
+# Admin Auth (Admin Login)
+@app.route('/admin/login', methods=['POST'])
+def admin_login():
+    data = request.get_json()
+    user = db.session.query(User).filter_by(email=data['email']).first()
+    if user and user.check_password(data['password']) and user.role == 'admin': 
+        access_token = create_access_token(identity=user.id)
+        session['user_id'] = user.id
+        return jsonify(access_token=access_token), 200
+    return jsonify({"msg": "Invalid admin credentials"}), 401
+
+# check if user is an admin
+def check_admin():
+    current_user_id = session.get('user_id')
+    if not current_user_id:
+        return jsonify({"msg": "You need to be logged in to perform this action!"}), 401
+
+    user = db.session.query(User).get(current_user_id)
+    if user is None or user.role != 'admin':
+        return jsonify({"msg": "You do not have permission to perform this action!"}), 403
+
+
