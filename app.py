@@ -303,6 +303,62 @@ def delete_message(message_id):
 
     return jsonify({"msg": "Message deleted successfully!"}), 200
 
+# Reporting a user (admin action)
+@app.route('/report', methods=['POST'])
+@jwt_required()
+def report_user():
+    current_user_id = session.get('user_id')
+    data = request.get_json()
+
+    reported_user_email = data.get('email')
+    reason = data.get('reason')
+
+    reported_user = db.session.query(User).filter_by(email=reported_user_email).first()
+    if not reported_user:
+        return jsonify({"msg": "User not found!"}), 404
+
+    report = Report(user_id=current_user_id, reported_user_id=reported_user.id, reason=reason)
+    db.session.add(report)
+    db.session.commit()
+
+    return jsonify({"msg": "Report submitted successfully!"}), 201
+
+
+# Admin: Ban and Unban Users
+@app.route('/admin/ban/<int:user_id>', methods=['POST'])
+@jwt_required()
+def ban_user(user_id):
+    # Admin check
+    admin_check = check_admin()
+    if admin_check:
+        return admin_check
+
+    user = db.session.query(User).get(user_id)
+    if not user:
+        return jsonify({"msg": "User not found!"}), 404
+
+    user.is_banned = True
+    db.session.commit()
+    return jsonify({"msg": "User banned successfully!"}), 200
+
+
+@app.route('/admin/unban/<int:user_id>', methods=['POST'])
+@jwt_required()
+def unban_user(user_id):
+    # Admin check
+    admin_check = check_admin()
+    if admin_check:
+        return admin_check
+
+    user = db.session.query(User).get(user_id)
+    if not user:
+        return jsonify({"msg": "User not found!"}), 404
+
+    user.is_banned = False
+    db.session.commit()
+    return jsonify({"msg": "User unbanned successfully!"}), 200
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
