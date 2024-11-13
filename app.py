@@ -286,6 +286,22 @@ def update_message(message_id):
     db.session.commit()
 
     return jsonify({"msg": "Message updated successfully!"}), 200
+@app.route('/messages/<int:message_id>/delete', methods=['DELETE'])
+@jwt_required()
+def delete_message(message_id):
+    current_user_id = session.get('user_id')
+    message = db.session.query(Message).get(message_id)
+
+    if not message:
+        return jsonify({"msg": "Message not found!"}), 404
+
+    if message.sender_id != current_user_id:
+        return jsonify({"msg": "You cannot delete other users' messages!"}), 403
+
+    db.session.delete(message)
+    db.session.commit()
+
+    return jsonify({"msg": "Message deleted successfully!"}), 200
 
 
 if __name__ == '__main__':
