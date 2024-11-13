@@ -119,3 +119,47 @@ def create_channel():
     db.session.add(new_channel)
     db.session.commit()
     return jsonify({"msg": "Channel created successfully!"}), 201
+
+
+
+@app.route('/channels/<int:channel_id>/update_description', methods=['PUT'])
+@jwt_required()
+def update_channel_description(channel_id):
+    current_user_id = session.get('user_id')
+    
+
+    channel = db.session.get(Channel, channel_id)
+
+    if not channel:
+        return jsonify({"msg": "Channel not found!"}), 404
+
+    if channel.owner_id != current_user_id:
+        return jsonify({"msg": "You do not have permission to edit this channel!"}), 403
+
+    data = request.get_json()
+    channel.description = data.get('description', channel.description)
+
+    db.session.commit()
+    return jsonify({"msg": "Channel description updated!"}), 200
+
+
+@app.route('/channels/<int:channel_id>/delete', methods=['DELETE'])
+@jwt_required()
+def delete_channel(channel_id):
+    current_user_id = session.get('user_id')
+    channel = db.session.query(Channel).get(channel_id)
+
+    if not channel:
+        return jsonify({"msg": "Channel not found!"}), 404
+
+    if channel.owner_id != current_user_id:
+        return jsonify({"msg": "You do not have permission to delete this channel!"}), 403
+
+    db.session.delete(channel)
+    db.session.commit()
+    return jsonify({"msg": "Channel deleted successfully!"}), 200
+
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
