@@ -249,9 +249,43 @@ def accept_invite():
         return jsonify({"msg": "Invite link expired!"}), 400
     except jwt.InvalidTokenError:
         return jsonify({"msg": "Invalid invite token!"}), 400
+    
+    # Routes for Messages (Add, Update, Delete, etc.)
+@app.route('/messages/<int:channel_id>', methods=['POST'])
+@jwt_required()
+def add_message(channel_id):
+    current_user_id = session.get('user_id')
+    data = request.get_json()
 
+    channel = db.session.query(Channel).get(channel_id)
 
+    if not channel:
+        return jsonify({"msg": "Channel not found!"}), 404
 
+    new_message = Message(content=data['content'], sender_id=current_user_id, channel_id=channel_id)
+    db.session.add(new_message)
+    db.session.commit()
+
+    return jsonify({"msg": "Message sent successfully!"}), 201
+
+@app.route('/messages/<int:message_id>/update', methods=['PUT'])
+@jwt_required()
+def update_message(message_id):
+    current_user_id = session.get('user_id')
+    data = request.get_json()
+
+    message = db.session.query(Message).get(message_id)
+
+    if not message:
+        return jsonify({"msg": "Message not found!"}), 404
+
+    if message.sender_id != current_user_id:
+        return jsonify({"msg": "You cannot edit other users' messages!"}), 403
+
+    message.content = data['content']
+    db.session.commit()
+
+    return jsonify({"msg": "Message updated successfully!"}), 200
 
 
 if __name__ == '__main__':
