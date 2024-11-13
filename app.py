@@ -159,6 +159,44 @@ def delete_channel(channel_id):
     db.session.commit()
     return jsonify({"msg": "Channel deleted successfully!"}), 200
 
+# PyJWT for generating JWT tokens
+import jwt  
+
+@app.route('/channels/<int:channel_id>/invite', methods=['POST'])
+@jwt_required()
+def invite_to_channel(channel_id):
+    current_user_id = session.get('user_id')
+    channel = db.session.query(Channel).get(channel_id)
+
+    if not channel or channel.owner_id != current_user_id:
+        return jsonify({"msg": "You do not have permission to invite users to this channel!"}), 403
+
+    invitee_email = request.json['email']
+    invitee = db.session.query(User).filter_by(email=invitee_email).first()
+
+    if invitee:
+        if invitee in channel.members:
+            return jsonify({"msg": "User is already a member of this channel!"}), 400
+    else:
+        invitee = None  
+
+    #  PyJWT to create an invite token
+    invite_token = jwt.encode(
+        {'channel_id': channel_id, 'invitee_email': invitee_email},
+        app.config['JWT_SECRET_KEY'],
+        algorithm='HS256'
+    )
+
+    # Sending the invite link (for example, via email, here we just print it)
+    invite_link = url_for('accept_invite', token=invite_token, _external=True)
+    print(f"Send this link to the invitee: {invite_link}")
+
+    return jsonify({"msg": "Invite sent successfully!"}), 200
+
+
+
+
+
 
 
 if __name__ == '__main__':
