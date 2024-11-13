@@ -100,5 +100,22 @@ def check_admin():
     user = db.session.query(User).get(current_user_id)
     if user is None or user.role != 'admin':
         return jsonify({"msg": "You do not have permission to perform this action!"}), 403
+    
+    
+# Routes for Channels (Create, Update, Delete, Invite, etc.)
+@app.route('/channels', methods=['POST'])
+@jwt_required()
+def create_channel():
+    current_user_id = session.get('user_id')
+    data = request.get_json()
+    channel_name = data['name']
+    channel_description = data.get('description', '')
 
+    user_channels_count = db.session.query(Channel).filter_by(owner_id=current_user_id).count()
+    if user_channels_count >= 5:
+        return jsonify({"msg": "You can only create up to 5 channels."}), 400
 
+    new_channel = Channel(name=channel_name, description=channel_description, owner_id=current_user_id)
+    db.session.add(new_channel)
+    db.session.commit()
+    return jsonify({"msg": "Channel created successfully!"}), 201
