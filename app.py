@@ -391,6 +391,49 @@ def reply_to_message(channel_id, message_id):
 
     return jsonify({"msg": "Reply sent successfully!", "reply_id": new_message.id}), 201
 
+# Get all reports (Admin only)
+@app.route('/admin/reports', methods=['GET'])
+@jwt_required()
+def get_reports():
+    # Admin check
+    admin_check = check_admin()
+    if admin_check:
+        return admin_check
+
+    # Query to get all reports
+    reports = db.session.query(Report).all()
+    report_list = [{
+        "id": report.id,
+        "reporter_id": report.user_id,
+        "reported_user_id": report.reported_user_id,
+        "reason": report.reason,
+        #"timestamp": report.timestamp
+    } for report in reports]
+
+    return jsonify({"reports": report_list}), 200
+
+
+# Get all channels (Admin only)
+@app.route('/admin/channels', methods=['GET'])
+@jwt_required()
+def get_all_channels():
+    # Admin check
+    admin_check = check_admin()
+    if admin_check:
+        return admin_check
+
+    # Query to get all channels
+    channels = db.session.query(Channel).all()
+    channel_list = [{
+        "id": channel.id,
+        "name": channel.name,
+        "description": channel.description,
+        "owner_id": channel.owner_id
+    } for channel in channels]
+
+    return jsonify({"channels": channel_list}), 200
+
+
 
 
 
