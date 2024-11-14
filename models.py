@@ -144,9 +144,11 @@ class Message(db.Model, SerializerMixin):
     sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     channel_id = db.Column(db.Integer, db.ForeignKey('channels.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    reply_to_id = db.Column(db.Integer, db.ForeignKey('messages.id'), nullable=True)
 
     # Relationship to sender
     sender = db.relationship('User', backref='messages_sent', lazy=True)
+    replies = db.relationship('Message', backref=db.backref('parent', remote_side=[id]), lazy=True)
 
     def __repr__(self):
         return f'<Message {self.content[:20]}>'
@@ -154,6 +156,8 @@ class Message(db.Model, SerializerMixin):
     def to_dict(self):
         data = super().to_dict()
         data['sender'] = self.sender.username
+        data['reply_to'] = self.reply_to_id 
+        data['replies'] = [reply.to_dict() for reply in self.replies] 
         return data
 
     # Serialization rules

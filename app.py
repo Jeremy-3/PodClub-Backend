@@ -358,6 +358,36 @@ def unban_user(user_id):
     db.session.commit()
     return jsonify({"msg": "User unbanned successfully!"}), 200
 
+@app.route('/messages/<int:channel_id>/reply/<int:message_id>', methods=['POST'])
+@jwt_required()
+def reply_to_message(channel_id, message_id):
+    current_user_id = session.get('user_id')
+    data = request.get_json()
+
+    # Check if the original message exists
+    original_message = db.session.query(Message).get(message_id)
+    if not original_message:
+        return jsonify({"msg": "Original message not found!"}), 404
+
+    # Check if the channel exists
+    channel = db.session.query(Channel).get(channel_id)
+    if not channel:
+        return jsonify({"msg": "Channel not found!"}), 404
+
+    # Create a new message as a reply
+    new_message = Message(
+        content=data['content'],
+        sender_id=current_user_id,
+        channel_id=channel_id,
+        reply_to_id=message_id 
+    )
+
+    db.session.add(new_message)
+    db.session.commit()
+
+    return jsonify({"msg": "Reply sent successfully!", "reply_id": new_message.id}), 201
+
+
 
 
 if __name__ == '__main__':
