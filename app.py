@@ -4,9 +4,13 @@ from models import db, User, Channel, Message, Report, ChannelMember
 import os
 import jwt 
 from flask_migrate import Migrate
+from flask_cors import CORS
 
 # Initialize Flask app
 app = Flask(__name__)
+
+# Enable CORS for all routes
+CORS(app)
 
 # Configurations
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///podclub.db'
