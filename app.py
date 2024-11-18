@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, request, session, url_for
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required,get_jwt_identity
 from models import db, User, Channel, Message, Report, ChannelMember
 import os
 import jwt 
@@ -433,8 +433,38 @@ def get_all_channels():
 
     return jsonify({"channels": channel_list}), 200
 
+@app.route('/user/channels', methods=['GET'])
+@jwt_required()
+def get_user_channels():
+    # Get the current logged-in user's ID from the JWT token
+    current_user_id = get_jwt_identity()
+    
+    if not current_user_id:
+        return jsonify({"msg": "You need to be logged in to view your channels!"}), 401
 
+    # Query for channels owned by the user
+    owned_channels = db.session.query(Channel).filter(Channel.owner_id == current_user_id).all()
 
+    # Query for channels where the user is a member
+    invited_channels = (
+        db.session.query(Channel)
+        .join(ChannelMember, Channel.id == ChannelMember.channel_id)
+        .filter(ChannelMember.user_id == current_user_id)
+        .all()
+    )
+
+    # Combine the two lists and remove duplicates using a dictionary keyed by channel ID
+    unique_channels = {channel.id: channel for channel in (owned_channels + invited_channels)}
+
+    # Format the response to return channel details
+    channel_list = [{
+        "id": channel.id,
+        "name": channel.name,
+        "description": channel.description,
+        "owner_id": channel.owner_id
+    } for channel in unique_channels.values()]
+
+    return jsonify({"channels": channel_list}), 200
 
 
 if __name__ == '__main__':
