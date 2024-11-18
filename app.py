@@ -498,6 +498,34 @@ def get_channel_messages(channel_id):
 
     return jsonify({"messages": message_list}), 200
 
+@app.route('/messages/<int:message_id>/replies', methods=['GET'])
+@jwt_required()
+def get_replies(message_id):
+    # Get the current logged-in user's ID
+    current_user_id = get_jwt_identity()
+
+    # Check if the original message exists
+    original_message = db.session.query(Message).get(message_id)
+    if not original_message:
+        return jsonify({"msg": "Original message not found!"}), 404
+
+    # Retrieve all replies for the specific message
+    replies = db.session.query(Message).filter_by(reply_to_id=message_id).order_by(Message.timestamp).all()
+
+    # Format the replies for response
+    reply_list = [
+        {
+            "id": reply.id,
+            "content": reply.content,
+            "sender_id": reply.sender_id,
+            "timestamp": reply.timestamp.isoformat() if reply.timestamp else None
+        }
+        for reply in replies
+    ]
+
+    return jsonify({"replies": reply_list}), 200
+
+
 
 
 if __name__ == '__main__':
