@@ -466,6 +466,39 @@ def get_user_channels():
 
     return jsonify({"channels": channel_list}), 200
 
+@app.route('/messages/<int:channel_id>', methods=['GET'])
+@jwt_required()
+def get_channel_messages(channel_id):
+    # Get the current logged-in user's ID
+    current_user_id = get_jwt_identity()
+    
+    # Check if the channel exists
+    channel = db.session.query(Channel).get(channel_id)
+    if not channel:
+        return jsonify({"msg": "Channel not found!"}), 404
+
+    # Check if the user is a member or owner of the channel
+    is_member = db.session.query(ChannelMember).filter_by(user_id=current_user_id, channel_id=channel_id).first()
+    if channel.owner_id != current_user_id and not is_member:
+        return jsonify({"msg": "You are not authorized to view messages in this channel!"}), 403
+
+    # Retrieve all messages for the channel
+    messages = db.session.query(Message).filter_by(channel_id=channel_id).order_by(Message.timestamp).all()
+
+    # Format the messages for response
+    message_list = [
+        {
+            "id": message.id,
+            "content": message.content,
+            "sender_id": message.sender_id,
+            "timestamp": message.timestamp.isoformat() if message.timestamp else None
+        }
+        for message in messages
+    ]
+
+    return jsonify({"messages": message_list}), 200
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)

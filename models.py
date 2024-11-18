@@ -145,6 +145,7 @@ class Message(db.Model, SerializerMixin):
     channel_id = db.Column(db.Integer, db.ForeignKey('channels.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     reply_to_id = db.Column(db.Integer, db.ForeignKey('messages.id'), nullable=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationship to sender
     sender = db.relationship('User', backref='messages_sent', lazy=True)
