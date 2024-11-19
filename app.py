@@ -433,6 +433,32 @@ def get_all_channels():
 
     return jsonify({"channels": channel_list}), 200
 
+# Get all users (Admin only)
+@app.route('/admin/users', methods=['GET'])
+@jwt_required()
+def get_all_users():
+    # Admin check
+    admin_check = check_admin()
+    if admin_check:
+        return admin_check
+
+    # Query to get all users
+    users = db.session.query(User).all()
+    user_list = [{
+        "id": user.id,
+        "name": user.username,
+        "email": user.email,
+        "user_id": user.id,
+        "is_banned": user.is_banned,
+        "channels": [channel.name for channel in user.channels]
+        
+    } for user in users]
+
+    return jsonify({"users": user_list}), 200
+
+
+
+
 @app.route('/user/channels', methods=['GET'])
 @jwt_required()
 def get_user_channels():
