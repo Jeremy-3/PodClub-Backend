@@ -449,6 +449,7 @@ def get_all_users():
         "name": user.username,
         "email": user.email,
         "user_id": user.id,
+        "is_banned": user.is_banned,
         "channels": [channel.name for channel in user.channels]
         
     } for user in users]
