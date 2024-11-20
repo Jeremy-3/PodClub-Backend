@@ -15,8 +15,7 @@ PodClub is a community-driven platform where users can connect, share, and disco
 ### Installation
 
 1. **Clone the repository:**
-   ```sh
-   git clone https://github.com/yourusername/podclub-backend.git
+   git clone https://github.com/Jeremy-3/PodClub-Backend.git
    cd podclub-backend
 ### Create and activate a virtual environment:
 python3 -m venv venv
