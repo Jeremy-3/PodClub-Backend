@@ -1,39 +1,40 @@
-from app.crud.permission import crud_permission
-from app.schemas.permission import PermissionCreate, PermissionUpdate, PermissionOut
-from app.dependencies.rbac import require_permission
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
-from app.db.session import get_db
-from app.schemas.response import ResponseModel
 from uuid import UUID
 
-router = APIRouter(prefix="/permissions", tags=["permissions"])
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+
+from app.crud.permission import crud_permission
+from app.db.session import get_db
+from app.dependencies.rbac import require_permission
+from app.schema.permission import PermissionCreate, PermissionOut, PermissionUpdate
+from app.schema.response import ResponseModel
+
+router = APIRouter(prefix="/permissions", tags=["Permissions"])
 
 
 @router.post(
     "",
     response_model=ResponseModel[PermissionOut],
-    dependencies=[Depends(require_permission("permissions.manage"))],
+    dependencies=[Depends(require_permission("permission.create"))],
 )
 def create_permission(
-    permission_create: PermissionCreate, db: Session = Depends(get_db)
+    payload: PermissionCreate, db: Session = Depends(get_db)
 ):
-    new_permission = crud_permission.create_permission(db, permission_create)
-    return ResponseModel(data=new_permission, message="Permission created successfully")
- 
+    permission = crud_permission.create_permission(db, payload)
+    return ResponseModel(data=permission, message="Permission created successfully")
+
 
 @router.get(
     "",
     response_model=ResponseModel[list[PermissionOut]],
-    dependencies=[Depends(require_permission("permissions.manage"))],
+    dependencies=[Depends(require_permission("permissions.view_all"))],
 )
 def get_all_permissions(
     db: Session = Depends(get_db),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
 ):
-    permissions, total = crud_permission.read(db,page=page, limit=limit)
-
+    permissions, total = crud_permission.read(db, page=page, limit=limit)
     return ResponseModel(
         data=permissions, total=total, message="Permissions retrieved successfully"
     )
@@ -41,8 +42,8 @@ def get_all_permissions(
 
 @router.get(
     "/{uid}",
-    response_model=ResponseModel,
-    dependencies=[Depends(require_permission("permissions.manage"))],
+    response_model=ResponseModel[PermissionOut],
+    dependencies=[Depends(require_permission("permission.view_one"))],
 )
 def get_permission(uid: UUID, db: Session = Depends(get_db)):
     permission = crud_permission.get_record_by_field(db, "uid", uid)
@@ -56,12 +57,20 @@ def get_permission(uid: UUID, db: Session = Depends(get_db)):
 @router.put(
     "/{uid}",
     response_model=ResponseModel[PermissionOut],
-    dependencies=[Depends(require_permission("permissions.edit"))],
+    dependencies=[Depends(require_permission("permission.update"))],
 )
 def update_permission(
-    uid: UUID, permission_update: PermissionUpdate, db: Session = Depends(get_db)
+    uid: UUID, payload: PermissionUpdate, db: Session = Depends(get_db)
 ):
-    updated_permission = crud_permission.update_permission(db, uid, permission_update)
-    return ResponseModel(
-        data=updated_permission, message="Permission updated successfully"
-    )
+    permission = crud_permission.update_permission(db, uid, payload)
+    return ResponseModel(data=permission, message="Permission updated successfully")
+
+
+@router.delete(
+    "/{uid}",
+    response_model=ResponseModel[None],
+    dependencies=[Depends(require_permission("permission.delete"))],
+)
+def delete_permission(uid: UUID, db: Session = Depends(get_db)):
+    crud_permission.delete_permission(db, uid)
+    return ResponseModel(message="Permission deleted successfully")
