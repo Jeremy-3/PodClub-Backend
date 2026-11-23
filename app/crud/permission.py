@@ -53,7 +53,6 @@ class CRUDPermission(CRUDBase[MODEL,PermissionCreate]):
                 detail="Permission not found",
             )
         
-        db.delete(record)
-        db.commit()
+        self.delete(db, record.id)
 
 crud_permission = CRUDPermission(MODEL)

@@ -45,7 +45,6 @@ class CRUDRole(CRUDBase[MODEL,RoleCreate]):
                 detail="Role not found",
             )
         
-        db.delete(record)
-        db.commit()
+        self.delete(db, record.id)
     
 crud_role = CRUDRole(MODEL)
