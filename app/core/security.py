@@ -1,54 +1,36 @@
-import bcrypt
-from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
-from typing import List
+import bcrypt
+import jwt
+
 from app.core.config import settings
 
-# -------------------------
-# Password hashing
-# -------------------------
 
 def hash_password(password: str) -> str:
-    """Hash password using bcrypt"""
-    # Truncate to 72 bytes if needed
-    password_bytes = password.encode('utf-8')
+    """Hash password using bcrypt. Rejects passwords longer than 72 bytes."""
+    password_bytes = password.encode("utf-8")
     if len(password_bytes) > 72:
-        password_bytes = password_bytes[:72]
-    
+        raise ValueError("Password cannot exceed 72 bytes")
     salt = bcrypt.gensalt()
-    hashed = bcrypt.hashpw(password_bytes, salt)
-    return hashed.decode('utf-8')
+    return bcrypt.hashpw(password_bytes, salt).decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify password against hash"""
+    """Verify plain password against hashed password."""
     try:
-        # Truncate plain password to 72 bytes if needed
-        password_bytes = plain_password.encode('utf-8')
-        if len(password_bytes) > 72:
-            password_bytes = password_bytes[:72]
-        
-        hash_bytes = hashed_password.encode('utf-8')
-        
+        password_bytes = plain_password.encode("utf-8")
+        hash_bytes = hashed_password.encode("utf-8")
         return bcrypt.checkpw(password_bytes, hash_bytes)
-    except Exception as e:
-        print(f"Password verification error: {e}")
+    except Exception:
         return False
 
 
-
-#-------------------------
-# JWT Token generation and verification
-#-------------------------
-
-def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
-    """Create a JWT access token"""
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-    return encoded_jwt
-
+def create_access_token(user_id: int) -> str:
+    """Create a signed JWT access token carrying only sub, iat, exp."""
+    now = datetime.now(timezone.utc)
+    expire = now + timedelta(seconds=settings.ACCESS_TOKEN_EXPIRE_SECONDS)
+    payload = {
+        "sub": str(user_id),
+        "iat": int(now.timestamp()),
+        "exp": int(expire.timestamp()),
+    }
+    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
