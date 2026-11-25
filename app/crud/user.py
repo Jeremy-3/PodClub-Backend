@@ -1,9 +1,7 @@
 from uuid import UUID
-
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from werkzeug.security import generate_password_hash
-
+from app.core.security import hash_password as generate_password_hash
 from app.crud.base import CRUDBase
 from app.models.users import Users
 from app.schema.user import UserCreate, UserCreateDB, UserUpdate
@@ -71,16 +69,18 @@ class CRUDUser(CRUDBase[MODEL, UserCreateDB]):
             )
 
         return self.update(db, record, update_data)
+    
+    
 
-    def delete_user(self, db: Session, uid: UUID):
-        record = self.get_record_by_field(db, "uid", uid)
-        if not record:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found",
-            )
+    # def delete_user(self, db: Session, uid: UUID):
+    #     record = self.get_record_by_field(db, "uid", uid)
+    #     if not record:
+    #         raise HTTPException(
+    #             status_code=status.HTTP_404_NOT_FOUND,
+    #             detail="User not found",
+    #         )
 
-        self.delete(db, record.id)
+    #     self.delete(db, record.id)
 
 
 crud_user = CRUDUser(MODEL)

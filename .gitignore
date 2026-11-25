@@ -25,3 +25,5 @@ dine-dash-postman.json
 *.njsproj
 *.sln
 *.sw?
+review_report.html
+postman
