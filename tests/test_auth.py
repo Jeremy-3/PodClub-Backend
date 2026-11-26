@@ -140,5 +140,5 @@ def test_auth_me_returns_permissions_loaded_from_database(
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["role"] == "user"
-    assert "podclub.create" in data["permissions"]
+    assert "club.create" in data["permissions"]
     assert "user.view_one" in data["permissions"]

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -68,6 +69,16 @@ class CRUDUser(CRUDBase[MODEL, UserCreateDB]):
             )
 
         return self.update(db, record, record_in)
+
+    def ban_user(self, db: Session, record: Users) -> Users:
+        return self.update(
+            db,
+            record,
+            {"banned_at": datetime.now(timezone.utc)},
+        )
+
+    def unban_user(self, db: Session, record: Users) -> Users:
+        return self.update(db, record, {"banned_at": None})
 
     def update_user_profile(
         self, db: Session, uid: UUID, record_in: UserProfileUpdate

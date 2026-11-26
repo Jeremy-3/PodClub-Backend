@@ -8,6 +8,7 @@ from app.crud.role_permission import crud_role_permission
 from app.crud.user import crud_user
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user
+from app.models.roles import RoleScope
 from app.models.users import Users
 from app.schema.auth import AuthMeOut, RegisterIn
 from app.schema.response import ResponseModel
@@ -19,10 +20,13 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 @router.post("/register", response_model=ResponseModel[UserOut])
 def register(payload: RegisterIn, db: Session = Depends(get_db)):
     role = crud_role.get_record_by_field(db, "name", "user")
-    if not role:
+    if role is None or role.scope != RoleScope.PLATFORM:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="The 'user' role is missing. Run 'python -m app.commands.seed'.",
+            detail=(
+                "The platform 'user' role is missing or has the wrong scope. "
+                "Run 'python -m app.commands.seed'."
+            ),
         )
 
     user = crud_user.register_user(db, payload, role.id)

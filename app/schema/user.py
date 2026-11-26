@@ -54,7 +54,6 @@ class UserProfileUpdate(BaseModel):
 class UserAdminUpdate(BaseModel):
     role_id: Optional[int] = None
     is_active: Optional[bool] = None
-    banned_at: Optional[datetime] = None
 
     model_config = {"extra": "forbid"}
 

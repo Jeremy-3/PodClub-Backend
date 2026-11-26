@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.crud.role_permission import crud_role_permission
+from app.core.perm_names import PERMISSIONS_MANAGE, ROLES_VIEW
 from app.db.session import get_db
 from app.dependencies.rbac import require_permission
 from app.schema.response import ResponseModel
@@ -17,7 +18,7 @@ router = APIRouter(prefix="/role-permissions", tags=["Role Permissions"])
 @router.post(
     "/assign",
     response_model=ResponseModel[list[int]],
-    dependencies=[Depends(require_permission("permissions.manage"))],
+    dependencies=[Depends(require_permission(PERMISSIONS_MANAGE))],
 )
 def assign_permission_to_role(
     payload: RolePermissionAssign, db: Session = Depends(get_db)
@@ -29,7 +30,7 @@ def assign_permission_to_role(
 @router.post(
     "/deassign",
     response_model=ResponseModel[RolePermissionDeassignOut],
-    dependencies=[Depends(require_permission("permissions.manage"))],
+    dependencies=[Depends(require_permission(PERMISSIONS_MANAGE))],
 )
 def deassign_permission_from_role(
     payload: RolePermissionAssign, db: Session = Depends(get_db)
@@ -41,7 +42,7 @@ def deassign_permission_from_role(
 @router.get(
     "/role/{role_id}",
     response_model=ResponseModel[RoleWithPermissionsOut],
-    dependencies=[Depends(require_permission("roles.view"))],
+    dependencies=[Depends(require_permission(ROLES_VIEW))],
 )
 def get_role_with_permissions(role_id: int, db: Session = Depends(get_db)):
     role = crud_role_permission.get_role_with_permissions(db, role_id)

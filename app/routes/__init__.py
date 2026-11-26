@@ -7,6 +7,7 @@ from app.routes.message import router as message_router
 from app.routes.permission import router as permission_router
 from app.routes.podcast import router as podcast_router
 from app.routes.podclub import router as podclub_router
+from app.routes.podclub_ban import router as podclub_ban_router
 from app.routes.podclub_member import router as podclub_member_router
 from app.routes.report import router as report_router
 from app.routes.role import router as role_router
@@ -20,6 +21,7 @@ api_router.include_router(role_router)
 api_router.include_router(permission_router)
 api_router.include_router(role_permission_router)
 api_router.include_router(podclub_router)
+api_router.include_router(podclub_ban_router)
 api_router.include_router(podclub_member_router)
 api_router.include_router(invite_router)
 api_router.include_router(podcast_router)

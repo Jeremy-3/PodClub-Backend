@@ -20,6 +20,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
             message=message,
             errors=errors,
         ).model_dump(),
+        headers=exc.headers,
     )
 
 

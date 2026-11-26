@@ -28,7 +28,9 @@ class CRUDMessage(CRUDBase[MODEL, MessageCreateDB]):
                 detail="Message not found",
             )
 
-        return self.update(db, record, record_in)
+        update_data = record_in.model_dump(exclude_unset=True)
+        update_data["is_edited"] = True
+        return self.update(db, record, update_data)
 
     def delete_message(self, db: Session, uid: UUID):
         record = self.get_record_by_field(db, "uid", uid)

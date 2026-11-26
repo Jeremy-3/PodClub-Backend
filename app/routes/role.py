@@ -4,6 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.crud.role import crud_role
+from app.core.perm_names import (
+    ROLE_CREATE,
+    ROLE_DELETE,
+    ROLE_UPDATE,
+    ROLE_VIEW_ONE,
+    ROLES_VIEW_ALL,
+)
 from app.db.session import get_db
 from app.dependencies.rbac import require_permission
 from app.schema.response import ResponseModel
@@ -15,7 +22,7 @@ router = APIRouter(prefix="/roles", tags=["Roles"])
 @router.post(
     "",
     response_model=ResponseModel[RoleOut],
-    dependencies=[Depends(require_permission("role.create"))],
+    dependencies=[Depends(require_permission(ROLE_CREATE))],
 )
 def create_role(payload: RoleCreate, db: Session = Depends(get_db)):
     role = crud_role.create_role(db, payload)
@@ -25,7 +32,7 @@ def create_role(payload: RoleCreate, db: Session = Depends(get_db)):
 @router.get(
     "",
     response_model=ResponseModel[list[RoleOut]],
-    dependencies=[Depends(require_permission("roles.view_all"))],
+    dependencies=[Depends(require_permission(ROLES_VIEW_ALL))],
 )
 def get_all_roles(
     db: Session = Depends(get_db),
@@ -41,7 +48,7 @@ def get_all_roles(
 @router.get(
     "/{uid}",
     response_model=ResponseModel[RoleOut],
-    dependencies=[Depends(require_permission("role.view_one"))],
+    dependencies=[Depends(require_permission(ROLE_VIEW_ONE))],
 )
 def get_role(uid: UUID, db: Session = Depends(get_db)):
     role = crud_role.get_record_by_field(db, "uid", uid)
@@ -55,7 +62,7 @@ def get_role(uid: UUID, db: Session = Depends(get_db)):
 @router.put(
     "/{uid}",
     response_model=ResponseModel[RoleOut],
-    dependencies=[Depends(require_permission("role.update"))],
+    dependencies=[Depends(require_permission(ROLE_UPDATE))],
 )
 def update_role(uid: UUID, payload: RoleUpdate, db: Session = Depends(get_db)):
     role = crud_role.update_role(db, uid, payload)
@@ -65,7 +72,7 @@ def update_role(uid: UUID, payload: RoleUpdate, db: Session = Depends(get_db)):
 @router.delete(
     "/{uid}",
     response_model=ResponseModel[None],
-    dependencies=[Depends(require_permission("role.delete"))],
+    dependencies=[Depends(require_permission(ROLE_DELETE))],
 )
 def delete_role(uid: UUID, db: Session = Depends(get_db)):
     crud_role.delete_role(db, uid)

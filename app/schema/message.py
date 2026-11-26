@@ -13,6 +13,8 @@ class MessageBase(BaseModel):
 
 
 class MessageCreate(MessageBase):
+    podclub_id: int
+
     model_config = {"extra": "forbid"}
 
 
@@ -21,8 +23,6 @@ class MessageCreateDB(MessageCreate):
 
 
 class MessageUpdate(BaseModel):
-    podclub_id: Optional[int] = None
-    parent_message_id: Optional[int] = None
     body: Optional[str] = None
     image_url: Optional[str] = None
 

@@ -7,13 +7,13 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models.users import Users
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+optional_oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/auth/login",
+    auto_error=False,
+)
 
 
-def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-) -> Users:
+def _get_user_from_token(token: str, db: Session) -> Users:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid or expired token",
@@ -59,4 +59,25 @@ def get_current_user(
             detail="User account is banned",
         )
 
+    return user
+
+
+def get_optional_current_user(
+    token: str | None = Depends(optional_oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> Users | None:
+    if token is None:
+        return None
+    return _get_user_from_token(token, db)
+
+
+def get_current_user(
+    user: Users | None = Depends(get_optional_current_user),
+) -> Users:
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return user

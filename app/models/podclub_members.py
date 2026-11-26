@@ -16,6 +16,15 @@ class PodClubMembers(Base):
     uid = Column(UUID(as_uuid=True), unique=True, nullable=False, server_default=text("gen_random_uuid()"))
     podclub_id = Column(Integer, ForeignKey("podclubs.id", ondelete="CASCADE"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    role_id = Column(
+        Integer,
+        ForeignKey(
+            "roles.id",
+            ondelete="RESTRICT",
+            name="fk_podclub_members_role_id_roles",
+        ),
+        nullable=False,
+    )
     joined_at = Column(TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     __table_args__ = (UniqueConstraint("podclub_id", "user_id", name="uq_member"),)
     created_at = Column(TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
@@ -25,3 +34,4 @@ class PodClubMembers(Base):
     # relationships
     podclub = relationship("PodClubs", back_populates="members")
     user = relationship("Users", back_populates="podclub_memberships")
+    role = relationship("Roles", foreign_keys=[role_id], back_populates="podclub_members")

@@ -1,10 +1,17 @@
+import enum
 from sqlalchemy import Column,String,Integer,ForeignKey,DateTime,TIMESTAMP,func,Boolean,text
+from sqlalchemy import Enum
 from datetime import datetime, timezone
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 from sqlalchemy.dialects.postgresql import UUID
 
 
+class ReportStatus(str, enum.Enum):
+    PENDING = "pending"
+    REVIEWED = "reviewed"
+    RESOLVED = "resolved"
+    DISMISSED = "dismissed"
 
 
 class Reports(Base):
@@ -17,7 +24,16 @@ class Reports(Base):
     reason = Column(String, nullable=False)
     message_id = Column(Integer, ForeignKey("messages.id", ondelete="SET NULL"),nullable=True)
     podclub_id = Column(Integer, ForeignKey("podclubs.id", ondelete="SET NULL"),nullable=True)
-    status = Column(String, nullable=False, default="pending")  # pending, reviewed, resolved
+    status = Column(
+        Enum(
+            ReportStatus,
+            name="report_status",
+            values_callable=lambda enum_type: [item.value for item in enum_type],
+        ),
+        nullable=False,
+        default=ReportStatus.PENDING,
+        server_default=text("'pending'"),
+    )
     reviewed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"),nullable=True)
     
     

@@ -28,6 +28,7 @@ class PodClubs(Base):
     # relationships
     owner = relationship("Users", back_populates="podclubs")
     members = relationship("PodClubMembers", back_populates="podclub")
+    bans = relationship("PodClubBans", back_populates="podclub")
     invites = relationship("Invites", back_populates="podclub")
     podcasts = relationship("Podcasts", back_populates="podclub")
     messages = relationship("Messages", back_populates="podclub")

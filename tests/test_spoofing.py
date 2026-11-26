@@ -16,16 +16,16 @@ def test_podclub_owner_id_cannot_be_supplied_by_client(client, user_a, user_a_to
 
 
 def test_message_sender_id_cannot_be_supplied_by_client(
-    client, user_a, user_a_token
+    client, club_context, super_admin_token, user_a
 ):
     response = client.post(
         "/messages",
         json={
-            "podclub_id": 1,
+            "podclub_id": club_context["club"].id,
             "body": "spoofed sender",
             "sender_id": user_a["id"],
         },
-        headers=_headers(user_a_token),
+        headers=_headers(super_admin_token),
     )
 
     assert response.status_code == 422

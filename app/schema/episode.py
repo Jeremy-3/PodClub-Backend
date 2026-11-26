@@ -15,13 +15,17 @@ class EpisodeBase(BaseModel):
 
 
 class EpisodeCreate(EpisodeBase):
+    podcast_id: int
     published_at: Optional[datetime] = None
 
     model_config = {"extra": "forbid"}
 
 
+class EpisodeCreateDB(EpisodeCreate):
+    created_by_id: int
+
+
 class EpisodeUpdate(BaseModel):
-    podcast_id: Optional[int] = None
     title: Optional[str] = None
     description: Optional[str] = None
     audio_url: Optional[str] = None

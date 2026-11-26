@@ -8,6 +8,7 @@ from sqlalchemy import (
     func,
     Boolean,
     text,
+    Index,
 )
 from datetime import datetime, timezone
 from sqlalchemy.orm import relationship
@@ -27,6 +28,10 @@ class Users(Base):
     )
     username = Column(String, unique=True, nullable=False)
     email = Column(String, unique=True, nullable=False)
+    __table_args__ = (
+        Index("uq_users_username_lower", func.lower(username), unique=True),
+        Index("uq_users_email_lower", func.lower(email), unique=True),
+    )
     password_hash = Column(String, nullable=False)
     avatar_url = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
@@ -53,7 +58,22 @@ class Users(Base):
     podclub_memberships = relationship("PodClubMembers", back_populates="user")
     sent_invites = relationship("Invites", back_populates="invited_by")
     created_podcasts = relationship("Podcasts", back_populates="creator")
+    created_episodes = relationship(
+        "Episodes",
+        foreign_keys="Episodes.created_by_id",
+        back_populates="created_by",
+    )
     sent_messages = relationship("Messages", foreign_keys="Messages.sender_id", back_populates="sender")
     reports_made = relationship("Reports", foreign_keys="Reports.reporter_id", back_populates="reporter")
     reports_against = relationship("Reports", foreign_keys="Reports.reported_user_id", back_populates="reported_user")
     reports_reviewed = relationship("Reports", foreign_keys="Reports.reviewed_by_id", back_populates="reviewed_by")
+    podclub_bans = relationship(
+        "PodClubBans",
+        foreign_keys="PodClubBans.user_id",
+        back_populates="user",
+    )
+    podclub_bans_issued = relationship(
+        "PodClubBans",
+        foreign_keys="PodClubBans.banned_by_id",
+        back_populates="banned_by",
+    )

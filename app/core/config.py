@@ -11,7 +11,6 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     ACCESS_TOKEN_EXPIRE_SECONDS: int = 18000
-    OTP_TOKEN_EXPIRE_SECONDS: int = 300
 
     JWT_SECRET_KEY: str = "not-secret-key"
     JWT_ALGORITHM: str = "HS256"

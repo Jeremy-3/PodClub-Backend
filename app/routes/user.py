@@ -5,10 +5,21 @@ from sqlalchemy.orm import Session
 
 from app.crud.role import crud_role
 from app.crud.user import crud_user
+from app.core.perm_names import (
+    ROLE_ADMIN,
+    ROLE_SUPER_ADMIN,
+    USER_CREATE,
+    USER_BAN,
+    USER_UPDATE,
+    USER_UNBAN,
+    USER_VIEW_ONE,
+    USERS_VIEW_ALL,
+)
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user
 from app.dependencies.rbac import require_permission
 from app.models.users import Users
+from app.models.roles import RoleScope
 from app.schema.response import ResponseModel
 from app.schema.user import (
     UserAdminUpdate,
@@ -22,11 +33,11 @@ router = APIRouter(prefix="/users", tags=["Users"])
 
 
 def _is_super_admin(user: Users) -> bool:
-    return user.role is not None and user.role.name == "super_admin"
+    return user.role is not None and user.role.name == ROLE_SUPER_ADMIN
 
 
 def _is_platform_admin(user: Users) -> bool:
-    return user.role is not None and user.role.name in {"super_admin", "admin"}
+    return user.role is not None and user.role.name in {ROLE_SUPER_ADMIN, ROLE_ADMIN}
 
 
 def _validate_role_assignment(db: Session, role_id: int, current_user: Users) -> None:
@@ -36,7 +47,12 @@ def _validate_role_assignment(db: Session, role_id: int, current_user: Users) ->
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Role not found",
         )
-    if role.name == "super_admin" and not _is_super_admin(current_user):
+    if role.scope != RoleScope.PLATFORM:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User accounts can only be assigned platform-scope roles",
+        )
+    if role.name == ROLE_SUPER_ADMIN and not _is_super_admin(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only a super_admin can assign the super_admin role",
@@ -46,7 +62,7 @@ def _validate_role_assignment(db: Session, role_id: int, current_user: Users) ->
 @router.post(
     "",
     response_model=ResponseModel[UserOut],
-    dependencies=[Depends(require_permission("user.create"))],
+    dependencies=[Depends(require_permission(USER_CREATE))],
 )
 def create_user(
     payload: UserCreate,
@@ -62,7 +78,7 @@ def create_user(
 @router.get(
     "",
     response_model=ResponseModel[list[UserOut]],
-    dependencies=[Depends(require_permission("users.view_all"))],
+    dependencies=[Depends(require_permission(USERS_VIEW_ALL))],
 )
 def get_all_users(
     db: Session = Depends(get_db),
@@ -102,10 +118,69 @@ def get_user_profile(
     return ResponseModel(data=user, message="User profile retrieved successfully")
 
 
+@router.post(
+    "/{uid}/ban",
+    response_model=ResponseModel[UserOut],
+    dependencies=[Depends(require_permission(USER_BAN))],
+)
+def ban_user(
+    uid: UUID,
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = crud_user.get_record_by_field(db, "uid", uid)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    if user.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot ban yourself",
+        )
+    if user.role is not None and user.role.name == ROLE_SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="A super_admin cannot be banned",
+        )
+    if (
+        user.role is not None
+        and user.role.name == ROLE_ADMIN
+        and not _is_super_admin(current_user)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only a super_admin can ban an admin",
+        )
+
+    banned_user = crud_user.ban_user(db, user)
+    return ResponseModel(data=banned_user, message="User banned successfully")
+
+
+@router.post(
+    "/{uid}/unban",
+    response_model=ResponseModel[UserOut],
+    dependencies=[Depends(require_permission(USER_UNBAN))],
+)
+def unban_user(
+    uid: UUID,
+    db: Session = Depends(get_db),
+):
+    user = crud_user.get_record_by_field(db, "uid", uid)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    unbanned_user = crud_user.unban_user(db, user)
+    return ResponseModel(data=unbanned_user, message="User unbanned successfully")
+
+
 @router.get(
     "/{uid}",
     response_model=ResponseModel[UserOut],
-    dependencies=[Depends(require_permission("user.view_one"))],
+    dependencies=[Depends(require_permission(USER_VIEW_ONE))],
 )
 def get_user(
     uid: UUID,
@@ -128,7 +203,7 @@ def get_user(
 @router.put(
     "/{uid}",
     response_model=ResponseModel[UserOut],
-    dependencies=[Depends(require_permission("user.update"))],
+    dependencies=[Depends(require_permission(USER_UPDATE))],
 )
 def update_user(
     uid: UUID,

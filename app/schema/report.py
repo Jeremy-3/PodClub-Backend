@@ -4,6 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.models.reports import ReportStatus
 
 class ReportBase(BaseModel):
     reporter_id: Optional[int] = None
@@ -11,7 +12,7 @@ class ReportBase(BaseModel):
     reason: str
     message_id: Optional[int] = None
     podclub_id: Optional[int] = None
-    status: str = "pending"
+    status: ReportStatus = ReportStatus.PENDING
     reviewed_by_id: Optional[int] = None
 
 
@@ -26,15 +27,11 @@ class ReportCreate(BaseModel):
 
 class ReportCreateDB(ReportCreate):
     reporter_id: int
-    status: str = "pending"
+    status: ReportStatus = ReportStatus.PENDING
 
 
 class ReportUpdate(BaseModel):
-    reported_user_id: Optional[int] = None
-    reason: Optional[str] = None
-    message_id: Optional[int] = None
-    podclub_id: Optional[int] = None
-    status: Optional[str] = None
+    status: ReportStatus
 
     model_config = {"extra": "forbid"}
 

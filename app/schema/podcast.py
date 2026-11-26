@@ -14,6 +14,8 @@ class PodcastBase(BaseModel):
 
 
 class PodcastCreate(PodcastBase):
+    podclub_id: int
+
     model_config = {"extra": "forbid"}
 
 
@@ -22,7 +24,6 @@ class PodcastCreateDB(PodcastCreate):
 
 
 class PodcastUpdate(BaseModel):
-    podclub_id: Optional[int] = None
     title: Optional[str] = None
     description: Optional[str] = None
     cover_url: Optional[str] = None

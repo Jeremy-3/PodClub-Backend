@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -35,7 +35,13 @@ class PodClubOut(PodClubBase):
     id: int
     uid: UUID
     owner_id: Optional[int] = None
+    my_role: Optional[Literal["club_owner", "club_moderator", "club_member"]] = None
     created_at: datetime
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class PodClubMyPermissionsOut(BaseModel):
+    role: Optional[Literal["club_owner", "club_moderator", "club_member"]] = None
+    permissions: list[str]

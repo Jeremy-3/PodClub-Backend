@@ -4,7 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
-from app.models.reports import Reports
+from app.models.reports import ReportStatus, Reports
 from app.schema.report import ReportCreate, ReportCreateDB, ReportUpdate
 
 
@@ -15,12 +15,18 @@ class CRUDReport(CRUDBase[MODEL, ReportCreateDB]):
     """CRUD operations for Report model"""
 
     def create_report(
-        self, db: Session, record_create: ReportCreate, reporter_id: int
+        self,
+        db: Session,
+        record_create: ReportCreate,
+        reporter_id: int,
+        podclub_id: int | None,
     ):
+        record_data = record_create.model_dump()
+        record_data["podclub_id"] = podclub_id
         db_obj = ReportCreateDB(
-            **record_create.model_dump(),
+            **record_data,
             reporter_id=reporter_id,
-            status="pending",
+            status=ReportStatus.PENDING,
         )
         return self.create(db, db_obj)
 

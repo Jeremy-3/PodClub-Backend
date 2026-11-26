@@ -14,6 +14,15 @@ class Episodes(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     uid = Column(UUID(as_uuid=True), unique=True, nullable=False, server_default=text("gen_random_uuid()"))
     podcast_id = Column(Integer, ForeignKey("podcasts.id", ondelete="CASCADE"), nullable=False)
+    created_by_id = Column(
+        Integer,
+        ForeignKey(
+            "users.id",
+            ondelete="SET NULL",
+            name="fk_episodes_created_by_id_users",
+        ),
+        nullable=True,
+    )
     title = Column(String, nullable=False)
     description = Column(String, nullable=True)
     audio_url = Column(String, nullable=False)
@@ -28,3 +37,4 @@ class Episodes(Base):
     
     # relationships
     podcast = relationship("Podcasts", back_populates="episodes")
+    created_by = relationship("Users", foreign_keys=[created_by_id], back_populates="created_episodes")

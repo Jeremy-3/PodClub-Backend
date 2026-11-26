@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -11,15 +11,15 @@ class PodClubMemberBase(BaseModel):
 
 
 class PodClubMemberCreate(PodClubMemberBase):
-    joined_at: Optional[datetime] = None
-
     model_config = {"extra": "forbid"}
 
 
+class PodClubMemberCreateDB(PodClubMemberCreate):
+    role_id: int
+
+
 class PodClubMemberUpdate(BaseModel):
-    podclub_id: Optional[int] = None
-    user_id: Optional[int] = None
-    joined_at: Optional[datetime] = None
+    role: Literal["club_moderator", "club_member"]
 
     model_config = {"extra": "forbid"}
 

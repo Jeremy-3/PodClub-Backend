@@ -7,113 +7,32 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.perm_names import (
+    GRANTS,
+    PERMISSION_NAMES,
+    ROLE_NAMES,
+    ROLE_CLUB_MEMBER,
+    ROLE_CLUB_MODERATOR,
+    ROLE_SCOPES,
+    ROLE_SUPER_ADMIN,
+    ROLE_USER,
+)
 from app.core.security import hash_password
 from app.db.session import get_db
 from app.models.episodes import Episodes
 from app.models.invites import Invites
 from app.models.message import Messages
 from app.models.permissions import Permissions
+from app.models.podclub_bans import PodClubBans
 from app.models.podclub_members import PodClubMembers
 from app.models.podclubs import PodClubs
 from app.models.podcasts import Podcasts
-from app.models.reports import Reports
+from app.models.reports import ReportStatus, Reports
 from app.models.role_permissions import RolePermission
-from app.models.roles import Roles
+from app.models.roles import RoleScope, Roles
 from app.models.users import Users
 
 ModelT = TypeVar("ModelT")
-
-ROLE_NAMES = ("super_admin", "admin", "user")
-
-PERMISSION_NAMES = (
-    "podclub.create",
-    "podclubs.view_all",
-    "podclub.view_one",
-    "podclub.update",
-    "podclub.delete",
-    "podclub_member.create",
-    "podclub_members.view_all",
-    "podclub_member.view_one",
-    "podclub_member.update",
-    "podclub_member.delete",
-    "invite.create",
-    "invites.view_all",
-    "invite.view_one",
-    "invite.update",
-    "invite.delete",
-    "podcast.create",
-    "podcasts.view_all",
-    "podcast.view_one",
-    "podcast.update",
-    "podcast.delete",
-    "episode.create",
-    "episodes.view_all",
-    "episode.view_one",
-    "episode.update",
-    "episode.delete",
-    "message.create",
-    "messages.view_all",
-    "message.view_one",
-    "message.update",
-    "message.delete",
-    "report.create",
-    "reports.view_all",
-    "report.view_one",
-    "report.update",
-    "report.delete",
-    "user.create",
-    "users.view_all",
-    "user.view_one",
-    "user.update",
-    "role.create",
-    "roles.view_all",
-    "role.view_one",
-    "role.update",
-    "role.delete",
-    "permission.create",
-    "permissions.view_all",
-    "permission.view_one",
-    "permission.update",
-    "permission.delete",
-    "permissions.manage",
-    "roles.view",
-)
-
-# TODO(1B): Replace these temporary grants with ownership and membership checks.
-USER_PERMISSION_NAMES = (
-    "podclub.create",
-    "podclubs.view_all",
-    "podclub.view_one",
-    "podclub.update",
-    "podclub.delete",
-    "podclub_member.create",
-    "podclub_members.view_all",
-    "podclub_member.view_one",
-    "podclub_member.update",
-    "podclub_member.delete",
-    "invite.create",
-    "invites.view_all",
-    "invite.view_one",
-    "invite.update",
-    "invite.delete",
-    "podcast.create",
-    "podcasts.view_all",
-    "podcast.view_one",
-    "podcast.update",
-    "podcast.delete",
-    "episode.create",
-    "episodes.view_all",
-    "episode.view_one",
-    "episode.update",
-    "episode.delete",
-    "message.create",
-    "messages.view_all",
-    "message.view_one",
-    "message.update",
-    "message.delete",
-    "report.create",
-    "user.view_one",
-)
 
 DUMMY_USERS = (
     ("alice", "alice@podclub.io"),
@@ -122,6 +41,8 @@ DUMMY_USERS = (
     ("dave", "dave@podclub.io"),
     ("erin", "erin@podclub.io"),
 )
+DUMMY_PASSWORD = "Password123!"
+PERMISSION_NAMES_SORTED = tuple(sorted(PERMISSION_NAMES))
 
 
 def get_or_create(
@@ -176,46 +97,40 @@ def _get_or_create_user(
     return user
 
 
-def _seed_roles_and_permissions(db: Session) -> dict[str, Roles]:
+def _seed_roles_and_permissions(
+    db: Session, reset_permissions: bool = False
+) -> dict[str, Roles]:
     roles: dict[str, Roles] = {}
     for name in ROLE_NAMES:
+        scope = RoleScope(ROLE_SCOPES[name])
         role, _ = get_or_create(
-            db, Roles, {"name": name}, {"active": True}
+            db,
+            Roles,
+            {"name": name},
+            {"active": True, "scope": scope, "is_system": True},
         )
         roles[name] = role
-        if name == "super_admin" and role.id != 1:
+        if name == ROLE_SUPER_ADMIN and role.id != 1:
             raise RuntimeError(
                 "The super_admin role must have id 1; seed an empty roles table first"
             )
 
     permissions: dict[str, Permissions] = {}
-    for name in PERMISSION_NAMES:
+    for name in PERMISSION_NAMES_SORTED:
         permission, _ = get_or_create(
             db,
             Permissions,
             {"name": name},
             {
-                "description": f"Route permission: {name}",
+                "description": f"Permission: {name}",
                 "category": name.split(".", maxsplit=1)[0],
             },
         )
         permissions[name] = permission
 
-    management_prefixes = ("role.", "roles.", "permission.", "permissions.")
-    admin_permission_names = tuple(
-        name
-        for name in PERMISSION_NAMES
-        if not name.startswith(management_prefixes)
-    )
-    role_grants = {
-        "super_admin": PERMISSION_NAMES,
-        "admin": admin_permission_names,
-        "user": USER_PERMISSION_NAMES,
-    }
-
     for role_name in ROLE_NAMES:
         role = roles[role_name]
-        for permission_name in role_grants[role_name]:
+        for permission_name in sorted(GRANTS[role_name]):
             get_or_create(
                 db,
                 RolePermission,
@@ -225,7 +140,86 @@ def _seed_roles_and_permissions(db: Session) -> dict[str, Roles]:
                 },
             )
 
+    if reset_permissions:
+        _reset_system_role_permissions(db, roles)
+
     return roles
+
+
+def _permission_reset_plan(
+    db: Session,
+) -> tuple[list[str], list[tuple[str, str]]]:
+    stale_permissions = sorted(
+        name
+        for (name,) in db.query(Permissions.name).all()
+        if name not in PERMISSION_NAMES
+    )
+    role_permission_rows = (
+        db.query(Roles.name, Permissions.name)
+        .join(RolePermission, RolePermission.role_id == Roles.id)
+        .join(Permissions, Permissions.id == RolePermission.permission_id)
+        .filter(Roles.name.in_(ROLE_NAMES))
+        .all()
+    )
+    extra_grants = sorted(
+        (role_name, permission_name)
+        for role_name, permission_name in role_permission_rows
+        if permission_name not in GRANTS[role_name]
+    )
+    return stale_permissions, extra_grants
+
+
+def _print_permission_reset_plan(
+    stale_permissions: list[str],
+    extra_grants: list[tuple[str, str]],
+) -> None:
+    print("Permission reset preview:")
+    print("Permissions to delete:")
+    if stale_permissions:
+        for permission_name in stale_permissions:
+            print(f"  {permission_name}")
+    else:
+        print("  (none)")
+
+    print("Extra system-role grants to remove:")
+    if extra_grants:
+        for role_name, permission_name in extra_grants:
+            print(f"  {role_name}: {permission_name}")
+    else:
+        print("  (none)")
+
+    if not stale_permissions and not extra_grants:
+        print("No permission rows or role grants need removal.")
+
+
+def _reset_system_role_permissions(
+    db: Session,
+    roles: dict[str, Roles],
+) -> None:
+    for role_name in ROLE_NAMES:
+        role = roles[role_name]
+        current_grants = (
+            db.query(RolePermission, Permissions.name)
+            .join(Permissions, Permissions.id == RolePermission.permission_id)
+            .filter(RolePermission.role_id == role.id)
+            .all()
+        )
+        for role_permission, permission_name in current_grants:
+            if permission_name not in GRANTS[role_name]:
+                db.delete(role_permission)
+
+    stale_permissions = (
+        db.query(Permissions)
+        .filter(Permissions.name.notin_(PERMISSION_NAMES_SORTED))
+        .all()
+    )
+    stale_ids = [permission.id for permission in stale_permissions]
+    if stale_ids:
+        db.query(RolePermission).filter(
+            RolePermission.permission_id.in_(stale_ids)
+        ).delete(synchronize_session=False)
+        for permission in stale_permissions:
+            db.delete(permission)
 
 
 def _seed_super_admin(db: Session, role_id: int) -> Users:
@@ -244,16 +238,16 @@ def _seed_super_admin(db: Session, role_id: int) -> Users:
     return user
 
 
-def _seed_dummy_data(db: Session, user_role_id: int) -> None:
+def _seed_dummy_data(db: Session, roles: dict[str, Roles]) -> None:
     users = {
         username: _get_or_create_user(
-            db, username, email, "Password123!", user_role_id
+            db, username, email, DUMMY_PASSWORD, roles[ROLE_USER].id
         )
         for username, email in DUMMY_USERS
     }
 
     clubs: dict[str, PodClubs] = {}
-    for name, owner in (
+    for name, owner_name in (
         ("PodClub Demo One", "alice"),
         ("PodClub Demo Two", "bob"),
         ("PodClub Demo Three", "carol"),
@@ -262,54 +256,86 @@ def _seed_dummy_data(db: Session, user_role_id: int) -> None:
             db,
             PodClubs,
             {"name": name},
-            {"owner_id": users[owner].id, "is_active": True, "is_private": False},
+            {
+                "owner_id": users[owner_name].id,
+                "is_active": True,
+                "is_private": False,
+            },
         )
         clubs[name] = club
 
     memberships = (
-        ("PodClub Demo One", "alice"),
-        ("PodClub Demo One", "bob"),
-        ("PodClub Demo Two", "bob"),
-        ("PodClub Demo Two", "carol"),
-        ("PodClub Demo Three", "carol"),
-        ("PodClub Demo Three", "dave"),
-        ("PodClub Demo Three", "erin"),
+        ("PodClub Demo One", "bob", ROLE_CLUB_MODERATOR),
+        ("PodClub Demo One", "dave", ROLE_CLUB_MEMBER),
+        ("PodClub Demo Two", "carol", ROLE_CLUB_MODERATOR),
+        ("PodClub Demo Two", "erin", ROLE_CLUB_MEMBER),
+        ("PodClub Demo Two", "alice", ROLE_CLUB_MEMBER),
+        ("PodClub Demo Three", "dave", ROLE_CLUB_MODERATOR),
+        ("PodClub Demo Three", "bob", ROLE_CLUB_MEMBER),
+        ("PodClub Demo Three", "erin", ROLE_CLUB_MEMBER),
     )
-    for club_name, username in memberships:
-        get_or_create(
+    role_ids = {name: role.id for name, role in roles.items()}
+    for club_name, username, role_name in memberships:
+        member, _ = get_or_create(
             db,
             PodClubMembers,
             {"podclub_id": clubs[club_name].id, "user_id": users[username].id},
+            {"role_id": role_ids[role_name]},
         )
+        if member.role_id != role_ids[role_name]:
+            member.role_id = role_ids[role_name]
+            db.flush()
 
-    podcast_one, _ = get_or_create(
-        db,
-        Podcasts,
-        {"title": "PodClub Demo Podcast One"},
-        {"podclub_id": clubs["PodClub Demo One"].id, "creator_id": users["alice"].id},
+    podcasts = (
+        (
+            "PodClub Demo Podcast One",
+            "PodClub Demo One",
+            "alice",
+        ),
+        (
+            "PodClub Demo Podcast Two",
+            "PodClub Demo Two",
+            "bob",
+        ),
     )
-    podcast_two, _ = get_or_create(
-        db,
-        Podcasts,
-        {"title": "PodClub Demo Podcast Two"},
-        {"podclub_id": clubs["PodClub Demo Two"].id, "creator_id": users["bob"].id},
-    )
+    podcast_by_title: dict[str, Podcasts] = {}
+    for title, club_name, creator_name in podcasts:
+        podcast, _ = get_or_create(
+            db,
+            Podcasts,
+            {"title": title},
+            {
+                "podclub_id": clubs[club_name].id,
+                "creator_id": users[creator_name].id,
+            },
+        )
+        podcast_by_title[title] = podcast
 
     episodes = (
-        (podcast_one, "PodClub Demo Episode One", 420),
-        (podcast_one, "PodClub Demo Episode Two", 510),
-        (podcast_two, "PodClub Demo Episode Three", 360),
+        ("PodClub Demo Podcast One", "PodClub Demo Episode One", 420, "alice"),
+        ("PodClub Demo Podcast One", "PodClub Demo Episode Two", 510, "alice"),
+        ("PodClub Demo Podcast Two", "PodClub Demo Episode Three", 360, "bob"),
     )
-    for podcast, title, duration in episodes:
-        get_or_create(
+    for podcast_title, title, duration, creator_name in episodes:
+        episode, _ = get_or_create(
             db,
             Episodes,
-            {"podcast_id": podcast.id, "title": title},
             {
-                "audio_url": f"https://example.com/audio/{title.lower().replace(' ', '-')}.mp3",
+                "podcast_id": podcast_by_title[podcast_title].id,
+                "title": title,
+            },
+            {
+                "created_by_id": users[creator_name].id,
+                "audio_url": (
+                    "https://example.com/audio/"
+                    f"{title.lower().replace(' ', '-')}.mp3"
+                ),
                 "duration": duration,
             },
         )
+        if episode.created_by_id is None:
+            episode.created_by_id = users[creator_name].id
+            db.flush()
 
     club_id = clubs["PodClub Demo One"].id
     root_message, _ = get_or_create(
@@ -345,15 +371,24 @@ def _seed_dummy_data(db: Session, user_role_id: int) -> None:
 
     get_or_create(
         db,
+        PodClubBans,
+        {"podclub_id": club_id, "user_id": users["erin"].id},
+        {"banned_by_id": users["alice"].id, "reason": "Seed club ban"},
+    )
+    get_or_create(
+        db,
         Reports,
         {
             "reason": "Seed report for demonstration",
             "reporter_id": users["alice"].id,
             "reported_user_id": users["bob"].id,
         },
-        {"podclub_id": club_id, "message_id": reply.id, "status": "pending"},
+        {
+            "podclub_id": club_id,
+            "message_id": reply.id,
+            "status": ReportStatus.PENDING,
+        },
     )
-
     get_or_create(
         db,
         Invites,
@@ -367,11 +402,45 @@ def _seed_dummy_data(db: Session, user_role_id: int) -> None:
     )
 
 
-def seed(db: Session, include_dummy: bool = False) -> None:
-    roles = _seed_roles_and_permissions(db)
-    _seed_super_admin(db, roles["super_admin"].id)
+def seed(
+    db: Session,
+    include_dummy: bool = False,
+    reset_permissions: bool = False,
+) -> dict[str, Roles]:
+    roles = _seed_roles_and_permissions(db, reset_permissions=reset_permissions)
+    _seed_super_admin(db, roles[ROLE_SUPER_ADMIN].id)
     if include_dummy:
-        _seed_dummy_data(db, roles["user"].id)
+        _seed_dummy_data(db, roles)
+    return roles
+
+
+def _print_summary(db: Session, include_dummy: bool) -> None:
+    counts = (
+        ("roles", Roles),
+        ("permissions", Permissions),
+        ("role_permissions", RolePermission),
+        ("users", Users),
+        ("podclubs", PodClubs),
+        ("podclub_members", PodClubMembers),
+        ("podclub_bans", PodClubBans),
+        ("podcasts", Podcasts),
+        ("episodes", Episodes),
+        ("messages", Messages),
+        ("reports", Reports),
+        ("invites", Invites),
+    )
+    print("Seed completed successfully.")
+    print(
+        "Counts: "
+        + ", ".join(
+            f"{name}={db.query(model).count()}" for name, model in counts
+        )
+    )
+    if include_dummy:
+        print("Dummy logins:")
+        for _, email in DUMMY_USERS:
+            print(f"  {email}")
+        print(f"  Password: {DUMMY_PASSWORD}")
 
 
 def main() -> None:
@@ -379,22 +448,56 @@ def main() -> None:
     parser.add_argument(
         "--dummy",
         action="store_true",
-        help="Also create demo users, clubs, podcasts, episodes, messages, report, and invite",
+        help="Also create the demo users and content",
+    )
+    parser.add_argument(
+        "--reset-permissions",
+        action="store_true",
+        help="After migration, reconcile system-role grants; take a pg_dump first",
+    )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Confirm --reset-permissions without an interactive prompt",
     )
     args = parser.parse_args()
+    if args.yes and not args.reset_permissions:
+        parser.error("--yes can only be used with --reset-permissions")
 
     db_generator = get_db()
     db = next(db_generator)
     try:
-        seed(db, include_dummy=args.dummy)
+        if args.reset_permissions:
+            stale_permissions, extra_grants = _permission_reset_plan(db)
+            _print_permission_reset_plan(stale_permissions, extra_grants)
+            if not args.yes:
+                try:
+                    confirmation = input(
+                        "This can remove grants and permission rows. "
+                        "Type 'yes' to continue: "
+                    )
+                except EOFError as exc:
+                    raise RuntimeError(
+                        "Interactive confirmation unavailable; rerun with --yes "
+                        "after taking a pg_dump backup."
+                    ) from exc
+                if confirmation != "yes":
+                    db.rollback()
+                    print("Permission reset cancelled; no changes made.")
+                    return
+
+        seed(
+            db,
+            include_dummy=args.dummy,
+            reset_permissions=args.reset_permissions,
+        )
         db.commit()
+        _print_summary(db, include_dummy=args.dummy)
     except Exception:
         db.rollback()
         raise
     finally:
         db_generator.close()
-
-    print("Seed completed successfully.")
 
 
 if __name__ == "__main__":

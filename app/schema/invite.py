@@ -12,6 +12,7 @@ class InviteBase(BaseModel):
 
 
 class InviteCreate(InviteBase):
+    podclub_id: int
     expires_at: Optional[datetime] = None
 
     model_config = {"extra": "forbid"}
@@ -24,8 +25,6 @@ class InviteCreateDB(InviteCreate):
 
 
 class InviteUpdate(BaseModel):
-    podclub_id: Optional[int] = None
-    email: Optional[EmailStr] = None
     expires_at: Optional[datetime] = None
     max_uses: Optional[int] = None
 

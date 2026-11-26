@@ -4,6 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.crud.permission import crud_permission
+from app.core.perm_names import (
+    PERMISSION_CREATE,
+    PERMISSION_DELETE,
+    PERMISSION_UPDATE,
+    PERMISSION_VIEW_ONE,
+    PERMISSIONS_VIEW_ALL,
+)
 from app.db.session import get_db
 from app.dependencies.rbac import require_permission
 from app.schema.permission import PermissionCreate, PermissionOut, PermissionUpdate
@@ -15,7 +22,7 @@ router = APIRouter(prefix="/permissions", tags=["Permissions"])
 @router.post(
     "",
     response_model=ResponseModel[PermissionOut],
-    dependencies=[Depends(require_permission("permission.create"))],
+    dependencies=[Depends(require_permission(PERMISSION_CREATE))],
 )
 def create_permission(
     payload: PermissionCreate, db: Session = Depends(get_db)
@@ -27,7 +34,7 @@ def create_permission(
 @router.get(
     "",
     response_model=ResponseModel[list[PermissionOut]],
-    dependencies=[Depends(require_permission("permissions.view_all"))],
+    dependencies=[Depends(require_permission(PERMISSIONS_VIEW_ALL))],
 )
 def get_all_permissions(
     db: Session = Depends(get_db),
@@ -43,7 +50,7 @@ def get_all_permissions(
 @router.get(
     "/{uid}",
     response_model=ResponseModel[PermissionOut],
-    dependencies=[Depends(require_permission("permission.view_one"))],
+    dependencies=[Depends(require_permission(PERMISSION_VIEW_ONE))],
 )
 def get_permission(uid: UUID, db: Session = Depends(get_db)):
     permission = crud_permission.get_record_by_field(db, "uid", uid)
@@ -57,7 +64,7 @@ def get_permission(uid: UUID, db: Session = Depends(get_db)):
 @router.put(
     "/{uid}",
     response_model=ResponseModel[PermissionOut],
-    dependencies=[Depends(require_permission("permission.update"))],
+    dependencies=[Depends(require_permission(PERMISSION_UPDATE))],
 )
 def update_permission(
     uid: UUID, payload: PermissionUpdate, db: Session = Depends(get_db)
@@ -69,7 +76,7 @@ def update_permission(
 @router.delete(
     "/{uid}",
     response_model=ResponseModel[None],
-    dependencies=[Depends(require_permission("permission.delete"))],
+    dependencies=[Depends(require_permission(PERMISSION_DELETE))],
 )
 def delete_permission(uid: UUID, db: Session = Depends(get_db)):
     crud_permission.delete_permission(db, uid)

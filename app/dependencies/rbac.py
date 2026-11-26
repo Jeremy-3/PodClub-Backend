@@ -5,6 +5,7 @@ from app.db.session import get_db
 from app.dependencies.auth import get_current_user
 from app.models.permissions import Permissions
 from app.models.role_permissions import RolePermission
+from app.models.roles import RoleScope
 from app.models.users import Users
 
 
@@ -13,13 +14,17 @@ def require_permission(permission_name: str):
         db: Session = Depends(get_db),
         current_user: Users = Depends(get_current_user),
     ):
-        if not current_user.role or not current_user.role.active:
+        if (
+            not current_user.role
+            or not current_user.role.active
+            or current_user.role.scope != RoleScope.PLATFORM
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="User has no active role assigned",
+                detail="User has no active platform role assigned",
             )
 
-        # Super admin bypasses all permission checks by role name
+        # Super admin bypasses platform permission checks by role name.
         if current_user.role.name == "super_admin":
             return True
 
