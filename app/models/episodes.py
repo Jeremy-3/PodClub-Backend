@@ -13,7 +13,7 @@ class Episodes(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     uid = Column(UUID(as_uuid=True), unique=True, nullable=False, server_default=text("gen_random_uuid()"))
-    podcast_id = Column(Integer, ForeignKey("podcasts.id", ondelete="SET NULL"),nullable=True)
+    podcast_id = Column(Integer, ForeignKey("podcasts.id", ondelete="CASCADE"), nullable=False)
     title = Column(String, nullable=False)
     description = Column(String, nullable=True)
     audio_url = Column(String, nullable=False)

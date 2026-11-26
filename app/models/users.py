@@ -31,11 +31,6 @@ class Users(Base):
     avatar_url = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     banned_at = Column(TIMESTAMP(timezone=True), nullable=True)  # no default
-    banned_at = Column(
-        TIMESTAMP(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        nullable=False,
-    )
     role_id = Column(
         Integer, ForeignKey("roles.id", ondelete="SET NULL"), nullable=True
     )
@@ -58,6 +53,7 @@ class Users(Base):
     podclub_memberships = relationship("PodClubMembers", back_populates="user")
     sent_invites = relationship("Invites", back_populates="invited_by")
     created_podcasts = relationship("Podcasts", back_populates="creator")
-    sent_messages = relationship("Messages", back_populates="sender")
-    reports_made = relationship("Reports", back_populates="reporter")
-    reports_against = relationship("Reports", back_populates="reported_user")
+    sent_messages = relationship("Messages", foreign_keys="Messages.sender_id", back_populates="sender")
+    reports_made = relationship("Reports", foreign_keys="Reports.reporter_id", back_populates="reporter")
+    reports_against = relationship("Reports", foreign_keys="Reports.reported_user_id", back_populates="reported_user")
+    reports_reviewed = relationship("Reports", foreign_keys="Reports.reviewed_by_id", back_populates="reviewed_by")

@@ -13,7 +13,7 @@ class Invites(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     uid = Column(UUID(as_uuid=True), unique=True, nullable=False, server_default=text("gen_random_uuid()"))
-    podclub_id = Column(Integer, ForeignKey("podclubs.id", ondelete="SET NULL"),nullable=True)
+    podclub_id = Column(Integer, ForeignKey("podclubs.id", ondelete="CASCADE"), nullable=False)
     email = Column(String, nullable=False)
     token = Column(String, nullable=False,unique=True,index=True)
     invited_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"),nullable=True)

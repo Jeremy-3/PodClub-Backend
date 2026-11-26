@@ -29,5 +29,6 @@ class Reports(Base):
     # relationships
     reporter = relationship("Users", foreign_keys=[reporter_id], back_populates="reports_made")
     reported_user = relationship("Users", foreign_keys=[reported_user_id], back_populates="reports_against")
+    reviewed_by = relationship("Users", foreign_keys=[reviewed_by_id], back_populates="reports_reviewed")
     message = relationship("Messages", back_populates="reports")
     podclub = relationship("PodClubs", back_populates="reports")

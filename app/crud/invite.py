@@ -1,3 +1,5 @@
+import secrets
+from datetime import datetime, timezone, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -15,13 +17,18 @@ class CRUDInvite(CRUDBase[MODEL, InviteCreate]):
     """CRUD operations for Invite model"""
 
     def create_invite(self, db: Session, record_create: InviteCreate):
-        if record_create.token:
+        if not record_create.token:
+            record_create.token = secrets.token_urlsafe(24)
+        else:
             existing_record = self.get_record_by_field(db, "token", record_create.token)
             if existing_record:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Invite token already exists",
                 )
+
+        if not record_create.expires_at:
+            record_create.expires_at = datetime.now(timezone.utc) + timedelta(days=2)
 
         return self.create(db, record_create)
 
