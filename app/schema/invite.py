@@ -8,29 +8,34 @@ from pydantic import BaseModel, EmailStr
 class InviteBase(BaseModel):
     podclub_id: Optional[int] = None
     email: EmailStr
-    invited_by_id: Optional[int] = None
     max_uses: int = 0
 
 
 class InviteCreate(InviteBase):
-    token: Optional[str] = None
     expires_at: Optional[datetime] = None
+
+    model_config = {"extra": "forbid"}
+
+
+class InviteCreateDB(InviteCreate):
+    token: str
+    invited_by_id: int
+    expires_at: datetime
 
 
 class InviteUpdate(BaseModel):
     podclub_id: Optional[int] = None
     email: Optional[EmailStr] = None
-    token: Optional[str] = None
-    invited_by_id: Optional[int] = None
-    accepted_at: Optional[datetime] = None
     expires_at: Optional[datetime] = None
     max_uses: Optional[int] = None
-    use_count: Optional[int] = None
+
+    model_config = {"extra": "forbid"}
 
 
 class InviteOut(InviteBase):
     id: int
     uid: UUID
+    invited_by_id: Optional[int] = None
     token: str
     accepted_at: Optional[datetime] = None
     expires_at: datetime

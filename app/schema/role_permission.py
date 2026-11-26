@@ -8,11 +8,13 @@ class RolePermissionBase(BaseModel):
     permission_id: int
 
 class RolePermissionCreate(RolePermissionBase):
-    pass
+    model_config = {"extra": "forbid"}
 
 class RolePermissionAssign(BaseModel):
     role_id: int
     permissions_id: List[int] 
+
+    model_config = {"extra": "forbid"}
 
 class RolePermissionDeassignOut(BaseModel):
     removed: List[int]
@@ -22,6 +24,8 @@ class RolePermissionDeassignOut(BaseModel):
 class RolePermissionUpdate(BaseModel):
     role_id: Optional[int] = None
     permissions_id: Optional[List[int]] = None
+
+    model_config = {"extra": "forbid"}
 
 class RolePermissionOut(BaseModel):
     id: int

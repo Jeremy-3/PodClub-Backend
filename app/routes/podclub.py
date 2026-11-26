@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.crud.podclub import crud_podclub
 from app.db.session import get_db
+from app.dependencies.auth import get_current_user
 from app.dependencies.rbac import require_permission
+from app.models.users import Users
 from app.schema.podclub import PodClubCreate, PodClubOut, PodClubUpdate
 from app.schema.response import ResponseModel
 
@@ -17,8 +19,12 @@ router = APIRouter(prefix="/podclubs", tags=["PodClubs"])
     response_model=ResponseModel[PodClubOut],
     dependencies=[Depends(require_permission("podclub.create"))],
 )
-def create_podclub(payload: PodClubCreate, db: Session = Depends(get_db)):
-    podclub = crud_podclub.create_podclub(db, payload)
+def create_podclub(
+    payload: PodClubCreate,
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    podclub = crud_podclub.create_podclub(db, payload, owner_id=current_user.id)
     return ResponseModel(data=podclub, message="PodClub created successfully")
 
 

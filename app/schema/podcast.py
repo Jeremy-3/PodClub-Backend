@@ -7,7 +7,6 @@ from pydantic import BaseModel
 
 class PodcastBase(BaseModel):
     podclub_id: Optional[int] = None
-    creator_id: Optional[int] = None
     title: str
     description: Optional[str] = None
     cover_url: Optional[str] = None
@@ -15,21 +14,27 @@ class PodcastBase(BaseModel):
 
 
 class PodcastCreate(PodcastBase):
-    pass
+    model_config = {"extra": "forbid"}
+
+
+class PodcastCreateDB(PodcastCreate):
+    creator_id: int
 
 
 class PodcastUpdate(BaseModel):
     podclub_id: Optional[int] = None
-    creator_id: Optional[int] = None
     title: Optional[str] = None
     description: Optional[str] = None
     cover_url: Optional[str] = None
     is_active: Optional[bool] = None
 
+    model_config = {"extra": "forbid"}
+
 
 class PodcastOut(PodcastBase):
     id: int
     uid: UUID
+    creator_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 

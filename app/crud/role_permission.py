@@ -83,5 +83,15 @@ class CRUDRolePermission(CRUDBase[MODEL, RolePermissionAssign]):
             )
         return role
 
+    def get_permissions_for_role(self, db: Session, role_id: int) -> list[str]:
+        rows = (
+            db.query(Permissions.name)
+            .join(RolePermission, RolePermission.permission_id == Permissions.id)
+            .filter(RolePermission.role_id == role_id)
+            .order_by(Permissions.name)
+            .all()
+        )
+        return [name for (name,) in rows]
+
 
 crud_role_permission = CRUDRolePermission(MODEL)

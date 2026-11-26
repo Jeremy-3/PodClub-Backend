@@ -7,11 +7,13 @@ class RoleBase(BaseModel):
     active: bool = True
 
 class RoleCreate(RoleBase):
-    pass
+    model_config = {"extra": "forbid"}
 
 class RoleUpdate(BaseModel):
     name: Optional[str] = None
     active: Optional[bool] = None
+
+    model_config = {"extra": "forbid"}
 
 class RoleOut(BaseModel):
     id:int

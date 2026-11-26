@@ -13,11 +13,15 @@ class PodClubMemberBase(BaseModel):
 class PodClubMemberCreate(PodClubMemberBase):
     joined_at: Optional[datetime] = None
 
+    model_config = {"extra": "forbid"}
+
 
 class PodClubMemberUpdate(BaseModel):
     podclub_id: Optional[int] = None
     user_id: Optional[int] = None
     joined_at: Optional[datetime] = None
+
+    model_config = {"extra": "forbid"}
 
 
 class PodClubMemberOut(PodClubMemberBase):

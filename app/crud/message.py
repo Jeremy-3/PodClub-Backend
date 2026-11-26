@@ -5,17 +5,20 @@ from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
 from app.models.message import Messages
-from app.schema.message import MessageCreate, MessageUpdate
+from app.schema.message import MessageCreate, MessageCreateDB, MessageUpdate
 
 
 MODEL = Messages
 
 
-class CRUDMessage(CRUDBase[MODEL, MessageCreate]):
+class CRUDMessage(CRUDBase[MODEL, MessageCreateDB]):
     """CRUD operations for Message model"""
 
-    def create_message(self, db: Session, record_create: MessageCreate):
-        return self.create(db, record_create)
+    def create_message(
+        self, db: Session, record_create: MessageCreate, sender_id: int
+    ):
+        db_obj = MessageCreateDB(**record_create.model_dump(), sender_id=sender_id)
+        return self.create(db, db_obj)
 
     def update_message(self, db: Session, uid: UUID, record_in: MessageUpdate):
         record = self.get_record_by_field(db, "uid", uid)

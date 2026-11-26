@@ -7,29 +7,32 @@ from pydantic import BaseModel
 
 class MessageBase(BaseModel):
     podclub_id: Optional[int] = None
-    sender_id: Optional[int] = None
     parent_message_id: Optional[int] = None
     body: Optional[str] = None
     image_url: Optional[str] = None
 
 
 class MessageCreate(MessageBase):
-    pass
+    model_config = {"extra": "forbid"}
+
+
+class MessageCreateDB(MessageCreate):
+    sender_id: int
 
 
 class MessageUpdate(BaseModel):
     podclub_id: Optional[int] = None
-    sender_id: Optional[int] = None
     parent_message_id: Optional[int] = None
     body: Optional[str] = None
     image_url: Optional[str] = None
-    is_edited: Optional[bool] = None
-    is_deleted: Optional[bool] = None
+
+    model_config = {"extra": "forbid"}
 
 
 class MessageOut(MessageBase):
     id: int
     uid: UUID
+    sender_id: Optional[int] = None
     is_edited: bool
     is_deleted: bool
     created_at: datetime

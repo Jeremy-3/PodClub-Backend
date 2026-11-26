@@ -5,16 +5,18 @@ from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
 from app.models.podclubs import PodClubs
-from app.schema.podclub import PodClubCreate, PodClubUpdate
+from app.schema.podclub import PodClubCreate, PodClubCreateDB, PodClubUpdate
 
 
 MODEL = PodClubs
 
 
-class CRUDPodClub(CRUDBase[MODEL, PodClubCreate]):
+class CRUDPodClub(CRUDBase[MODEL, PodClubCreateDB]):
     """CRUD operations for PodClub model"""
 
-    def create_podclub(self, db: Session, record_create: PodClubCreate):
+    def create_podclub(
+        self, db: Session, record_create: PodClubCreate, owner_id: int
+    ):
         existing_record = self.get_record_by_field(db, "name", record_create.name)
         if existing_record:
             raise HTTPException(
@@ -22,7 +24,8 @@ class CRUDPodClub(CRUDBase[MODEL, PodClubCreate]):
                 detail="PodClub name already exists",
             )
 
-        return self.create(db, record_create)
+        db_obj = PodClubCreateDB(**record_create.model_dump(), owner_id=owner_id)
+        return self.create(db, db_obj)
 
     def update_podclub(self, db: Session, uid: UUID, record_in: PodClubUpdate):
         record = self.get_record_by_field(db, "uid", uid)

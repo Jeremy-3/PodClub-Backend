@@ -11,12 +11,13 @@ class EpisodeBase(BaseModel):
     description: Optional[str] = None
     audio_url: str
     duration: int
-    play_count: int = 0
     is_active: bool = True
 
 
 class EpisodeCreate(EpisodeBase):
     published_at: Optional[datetime] = None
+
+    model_config = {"extra": "forbid"}
 
 
 class EpisodeUpdate(BaseModel):
@@ -25,14 +26,16 @@ class EpisodeUpdate(BaseModel):
     description: Optional[str] = None
     audio_url: Optional[str] = None
     duration: Optional[int] = None
-    play_count: Optional[int] = None
     published_at: Optional[datetime] = None
     is_active: Optional[bool] = None
+
+    model_config = {"extra": "forbid"}
 
 
 class EpisodeOut(EpisodeBase):
     id: int
     uid: UUID
+    play_count: int
     published_at: datetime
     created_at: datetime
     updated_at: datetime

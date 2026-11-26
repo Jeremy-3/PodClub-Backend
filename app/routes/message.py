@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.crud.message import crud_message
 from app.db.session import get_db
+from app.dependencies.auth import get_current_user
 from app.dependencies.rbac import require_permission
+from app.models.users import Users
 from app.schema.message import MessageCreate, MessageOut, MessageUpdate
 from app.schema.response import ResponseModel
 
@@ -17,8 +19,12 @@ router = APIRouter(prefix="/messages", tags=["Messages"])
     response_model=ResponseModel[MessageOut],
     dependencies=[Depends(require_permission("message.create"))],
 )
-def create_message(payload: MessageCreate, db: Session = Depends(get_db)):
-    message = crud_message.create_message(db, payload)
+def create_message(
+    payload: MessageCreate,
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    message = crud_message.create_message(db, payload, sender_id=current_user.id)
     return ResponseModel(data=message, message="Message created successfully")
 
 

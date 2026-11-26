@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.crud.invite import crud_invite
 from app.db.session import get_db
+from app.dependencies.auth import get_current_user
 from app.dependencies.rbac import require_permission
+from app.models.users import Users
 from app.schema.invite import InviteCreate, InviteOut, InviteUpdate
 from app.schema.response import ResponseModel
 
@@ -17,8 +19,12 @@ router = APIRouter(prefix="/invites", tags=["Invites"])
     response_model=ResponseModel[InviteOut],
     dependencies=[Depends(require_permission("invite.create"))],
 )
-def create_invite(payload: InviteCreate, db: Session = Depends(get_db)):
-    invite = crud_invite.create_invite(db, payload)
+def create_invite(
+    payload: InviteCreate,
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    invite = crud_invite.create_invite(db, payload, invited_by_id=current_user.id)
     return ResponseModel(data=invite, message="Invite created successfully")
 
 

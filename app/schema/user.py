@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+from app.utils.validate import validate_password
 from app.schema.role import RoleOut
 
 
@@ -31,15 +33,30 @@ class UserCreate(BaseModel):
     role_id: Optional[int] = None
     is_active: bool = True
 
+    model_config = {"extra": "forbid"}
 
-class UserUpdate(BaseModel):
-    username: Optional[str] = None
-    email: Optional[EmailStr] = None
-    password: Optional[str] = None
+    @field_validator("password")
+    @classmethod
+    def validate_password_input(cls, value: str) -> str:
+        validate_password(value)
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("Password cannot exceed 72 bytes")
+        return value
+
+
+class UserProfileUpdate(BaseModel):
+    username: Optional[str] = Field(default=None, min_length=3, max_length=50)
     avatar_url: Optional[str] = None
+
+    model_config = {"extra": "forbid"}
+
+
+class UserAdminUpdate(BaseModel):
     role_id: Optional[int] = None
     is_active: Optional[bool] = None
     banned_at: Optional[datetime] = None
+
+    model_config = {"extra": "forbid"}
 
 
 class UserOut(UserBase):
@@ -49,5 +66,14 @@ class UserOut(UserBase):
     role: Optional[RoleOut] = None
     created_at: datetime
     updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UserPublicOut(BaseModel):
+    uid: UUID
+    username: str
+    avatar_url: Optional[str] = None
+    created_at: datetime
 
     model_config = {"from_attributes": True}

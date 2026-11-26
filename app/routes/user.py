@@ -3,13 +3,44 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.crud.role import crud_role
 from app.crud.user import crud_user
 from app.db.session import get_db
+from app.dependencies.auth import get_current_user
 from app.dependencies.rbac import require_permission
+from app.models.users import Users
 from app.schema.response import ResponseModel
-from app.schema.user import UserCreate, UserOut, UserUpdate
+from app.schema.user import (
+    UserAdminUpdate,
+    UserCreate,
+    UserOut,
+    UserProfileUpdate,
+    UserPublicOut,
+)
 
 router = APIRouter(prefix="/users", tags=["Users"])
+
+
+def _is_super_admin(user: Users) -> bool:
+    return user.role is not None and user.role.name == "super_admin"
+
+
+def _is_platform_admin(user: Users) -> bool:
+    return user.role is not None and user.role.name in {"super_admin", "admin"}
+
+
+def _validate_role_assignment(db: Session, role_id: int, current_user: Users) -> None:
+    role = crud_role.get_record_by_field(db, "id", role_id)
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Role not found",
+        )
+    if role.name == "super_admin" and not _is_super_admin(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only a super_admin can assign the super_admin role",
+        )
 
 
 @router.post(
@@ -17,7 +48,13 @@ router = APIRouter(prefix="/users", tags=["Users"])
     response_model=ResponseModel[UserOut],
     dependencies=[Depends(require_permission("user.create"))],
 )
-def create_user(payload: UserCreate, db: Session = Depends(get_db)):
+def create_user(
+    payload: UserCreate,
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if payload.role_id is not None:
+        _validate_role_assignment(db, payload.role_id, current_user)
     user = crud_user.create_user(db, payload)
     return ResponseModel(data=user, message="User created successfully")
 
@@ -38,16 +75,52 @@ def get_all_users(
     )
 
 
+@router.put("/me", response_model=ResponseModel[UserOut])
+def update_my_profile(
+    payload: UserProfileUpdate,
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = crud_user.update_user_profile(db, current_user.uid, payload)
+    return ResponseModel(data=user, message="Profile updated successfully")
+
+
+@router.get(
+    "/{uid}/profile",
+    response_model=ResponseModel[UserPublicOut],
+)
+def get_user_profile(
+    uid: UUID,
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = crud_user.get_record_by_field(db, "uid", uid)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+    return ResponseModel(data=user, message="User profile retrieved successfully")
+
+
 @router.get(
     "/{uid}",
     response_model=ResponseModel[UserOut],
     dependencies=[Depends(require_permission("user.view_one"))],
 )
-def get_user(uid: UUID, db: Session = Depends(get_db)):
+def get_user(
+    uid: UUID,
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     user = crud_user.get_record_by_field(db, "uid", uid)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+    if user.id != current_user.id and not _is_platform_admin(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You may only view your own account or an account as an admin",
         )
     return ResponseModel(data=user, message="User retrieved successfully")
 
@@ -57,9 +130,29 @@ def get_user(uid: UUID, db: Session = Depends(get_db)):
     response_model=ResponseModel[UserOut],
     dependencies=[Depends(require_permission("user.update"))],
 )
-def update_user(uid: UUID, payload: UserUpdate, db: Session = Depends(get_db)):
-    user = crud_user.update_user(db, uid, payload)
-    return ResponseModel(data=user, message="User updated successfully")
+def update_user(
+    uid: UUID,
+    payload: UserAdminUpdate,
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = crud_user.get_record_by_field(db, "uid", uid)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    is_super_admin = _is_super_admin(current_user)
+    if not is_super_admin and user.role and user.role.name == "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only a super_admin can modify a super_admin",
+        )
+    if payload.role_id is not None:
+        _validate_role_assignment(db, payload.role_id, current_user)
+
+    updated_user = crud_user.update_user(db, uid, payload)
+    return ResponseModel(data=updated_user, message="User updated successfully")
 
 
 # @router.delete(

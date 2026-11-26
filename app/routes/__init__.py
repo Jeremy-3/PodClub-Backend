@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.routes.auth import router as auth_router
 from app.routes.episode import router as episode_router
 from app.routes.invite import router as invite_router
 from app.routes.message import router as message_router
@@ -13,6 +14,7 @@ from app.routes.role_permission import router as role_permission_router
 from app.routes.user import router as user_router
 
 api_router = APIRouter()
+api_router.include_router(auth_router)
 api_router.include_router(user_router)
 api_router.include_router(role_router)
 api_router.include_router(permission_router)

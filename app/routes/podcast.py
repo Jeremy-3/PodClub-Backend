@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.crud.podcast import crud_podcast
 from app.db.session import get_db
+from app.dependencies.auth import get_current_user
 from app.dependencies.rbac import require_permission
+from app.models.users import Users
 from app.schema.podcast import PodcastCreate, PodcastOut, PodcastUpdate
 from app.schema.response import ResponseModel
 
@@ -17,8 +19,12 @@ router = APIRouter(prefix="/podcasts", tags=["Podcasts"])
     response_model=ResponseModel[PodcastOut],
     dependencies=[Depends(require_permission("podcast.create"))],
 )
-def create_podcast(payload: PodcastCreate, db: Session = Depends(get_db)):
-    podcast = crud_podcast.create_podcast(db, payload)
+def create_podcast(
+    payload: PodcastCreate,
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    podcast = crud_podcast.create_podcast(db, payload, creator_id=current_user.id)
     return ResponseModel(data=podcast, message="Podcast created successfully")
 
 

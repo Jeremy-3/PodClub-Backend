@@ -16,22 +16,27 @@ class ReportBase(BaseModel):
 
 
 class ReportCreate(BaseModel):
-    reporter_id: Optional[int] = None
     reported_user_id: Optional[int] = None
     reason: str
     message_id: Optional[int] = None
     podclub_id: Optional[int] = None
+
+    model_config = {"extra": "forbid"}
+
+
+class ReportCreateDB(ReportCreate):
+    reporter_id: int
     status: str = "pending"
 
 
 class ReportUpdate(BaseModel):
-    reporter_id: Optional[int] = None
     reported_user_id: Optional[int] = None
     reason: Optional[str] = None
     message_id: Optional[int] = None
     podclub_id: Optional[int] = None
     status: Optional[str] = None
-    reviewed_by_id: Optional[int] = None
+
+    model_config = {"extra": "forbid"}
 
 
 class ReportOut(ReportBase):

@@ -8,12 +8,14 @@ class PermissionBase(BaseModel):
     category: str
 
 class PermissionCreate(PermissionBase):
-    pass
+    model_config = {"extra": "forbid"}
 
 class PermissionUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
+
+    model_config = {"extra": "forbid"}
 
 class PermissionOut(PermissionBase):
     id: int

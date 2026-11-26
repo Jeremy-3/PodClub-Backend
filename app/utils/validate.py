@@ -1,10 +1,13 @@
 import re
-from pydantic import EmailStr, ValidationError
+from pydantic import EmailStr, TypeAdapter, ValidationError
+
+
+email_validator = TypeAdapter(EmailStr)
 
 
 def valid_email(value: str) -> bool:
     try:
-        EmailStr.validate_python(value)
+        email_validator.validate_python(value)
         return True
     except ValidationError:
         return False

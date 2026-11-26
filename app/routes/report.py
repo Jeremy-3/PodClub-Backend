@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.crud.report import crud_report
 from app.db.session import get_db
+from app.dependencies.auth import get_current_user
 from app.dependencies.rbac import require_permission
+from app.models.users import Users
 from app.schema.report import ReportCreate, ReportOut, ReportUpdate
 from app.schema.response import ResponseModel
 
@@ -17,8 +19,12 @@ router = APIRouter(prefix="/reports", tags=["Reports"])
     response_model=ResponseModel[ReportOut],
     dependencies=[Depends(require_permission("report.create"))],
 )
-def create_report(payload: ReportCreate, db: Session = Depends(get_db)):
-    report = crud_report.create_report(db, payload)
+def create_report(
+    payload: ReportCreate,
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    report = crud_report.create_report(db, payload, reporter_id=current_user.id)
     return ResponseModel(data=report, message="Report created successfully")
 
 
@@ -57,8 +63,15 @@ def get_report(uid: UUID, db: Session = Depends(get_db)):
     response_model=ResponseModel[ReportOut],
     dependencies=[Depends(require_permission("report.update"))],
 )
-def update_report(uid: UUID, payload: ReportUpdate, db: Session = Depends(get_db)):
-    report = crud_report.update_report(db, uid, payload)
+def update_report(
+    uid: UUID,
+    payload: ReportUpdate,
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    report = crud_report.update_report(
+        db, uid, payload, reviewed_by_id=current_user.id
+    )
     return ResponseModel(data=report, message="Report updated successfully")
 
 

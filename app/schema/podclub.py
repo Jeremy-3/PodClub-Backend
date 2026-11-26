@@ -11,11 +11,14 @@ class PodClubBase(BaseModel):
     cover_url: Optional[str] = None
     is_active: bool = True
     is_private: bool = False
-    owner_id: Optional[int] = None
 
 
 class PodClubCreate(PodClubBase):
-    pass
+    model_config = {"extra": "forbid"}
+
+
+class PodClubCreateDB(PodClubCreate):
+    owner_id: int
 
 
 class PodClubUpdate(BaseModel):
@@ -24,12 +27,14 @@ class PodClubUpdate(BaseModel):
     cover_url: Optional[str] = None
     is_active: Optional[bool] = None
     is_private: Optional[bool] = None
-    owner_id: Optional[int] = None
+
+    model_config = {"extra": "forbid"}
 
 
 class PodClubOut(PodClubBase):
     id: int
     uid: UUID
+    owner_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
