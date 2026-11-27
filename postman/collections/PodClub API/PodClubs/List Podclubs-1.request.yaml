@@ -1,0 +1,5 @@
+$kind: http-request
+name: List Podclubs
+url: ""
+method: GET
+order: 704

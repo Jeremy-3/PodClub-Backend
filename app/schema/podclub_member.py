@@ -4,8 +4,12 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+# from app.schema.user import UserOut
+# from app.schema.podclub import PodClubOut
 
 class PodClubMemberBase(BaseModel):
+    # user: UserOut
+    # podclub: PodClubOut
     podclub_id: int
     user_id: int
 
