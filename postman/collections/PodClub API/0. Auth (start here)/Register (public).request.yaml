@@ -1,0 +1,16 @@
+$kind: http-request
+url: "{{base_url}}/auth/register"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "username": "newuser_{{$timestamp}}",
+      "email": "newuser_{{$timestamp}}@podclub.io",
+      "password": "Password123!"
+    }
+auth:
+  type: noauth
+order: 1000

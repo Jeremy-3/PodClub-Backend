@@ -1,0 +1,9 @@
+$kind: http-request
+name: "EXPECT 403: user lists all users"
+url: "{{base_url}}/users"
+method: GET
+scripts:
+  - type: afterResponse
+    code: pm.test("403 forbidden", () => pm.response.to.have.status(403));
+    language: text/javascript
+order: 1000

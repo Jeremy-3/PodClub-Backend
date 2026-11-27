@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{base_url}}/episodes/{{uid}}"
+method: PUT
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "title": "Episode 1 (edited)"
+    }
+order: 4000

@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{base_url}}/messages/{{uid}}"
+method: PUT
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "body": "edited"
+    }
+order: 4000

@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{base_url}}/roles/{{uid}}"
+method: PUT
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "active": false
+    }
+order: 4000

@@ -1,0 +1,8 @@
+$kind: http-request
+url: "{{base_url}}/messages?podclub_id={{podclub_id}}&page=1&limit=10"
+method: GET
+queryParams:
+  podclub_id: "{{podclub_id}}"
+  page: "1"
+  limit: "10"
+order: 1000

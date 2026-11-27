@@ -1,166 +1,327 @@
 # PodClub Backend
 
-## Overview
+FastAPI backend for PodClub using SQLAlchemy 2, PostgreSQL, Alembic, and JWT
+authentication. It currently implements Phase 1B club-scoped authorization,
+memberships, club bans, reports, and platform roles.
 
-PodClub is a community-driven platform where users can connect, share, and discover podcasts. This repository contains the backend code for the PodClub application, built using Flask, SQLAlchemy, and other relevant Python libraries.
+## Stack
 
-## Setup and Installation
+- FastAPI and Uvicorn
+- PostgreSQL
+- SQLAlchemy 2
+- Alembic
+- PyJWT and bcrypt
+- Pydantic 2
+- pytest and httpx
 
-### Prerequisites
+## Requirements
 
-- Python 3.8 or higher
-- Virtual environment (optional but recommended)
-- SQLite (for the development database)
+- Python 3.12 recommended
+- PostgreSQL running on `localhost:5432`
+- A virtual environment
 
-### Installation
+The application database and test database must be separate. Tests are configured
+for a real PostgreSQL test database and do not support SQLite.
 
-1. **Clone the repository:**
-   git clone https://github.com/Jeremy-3/PodClub-Backend.git
-   cd podclub-backend
-### Create and activate a virtual environment:
-python3 -m venv venv
-source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-### Install dependencies:
+## Installation
+
+Clone the repository and enter it:
+
+```bash
+git clone https://github.com/Jeremy-3/PodClub-Backend.git
+cd PodClub-Backend
+```
+
+PowerShell:
+
+```powershell
+py -3.12 -m venv venv
+.\venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 pip install -r requirements.txt
-### Set up the database:
-flask db init
-flask db migrate
-flask db upgrade
-### Seed the database with initial data:
-python seed.py
-### Running the Application
-#### Start the Flask server:
-flask run
-### Access the application: 
-Open your web browser and go to http://127.0.0.1:5000.
+```
 
-### Project Structure
+bash:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+## Environment
+
+Copy `.env.example` to `.env`:
+
+PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+bash:
+
+```bash
+cp .env.example .env
+```
+
+Update `.env` with local PostgreSQL credentials and secrets. Do not commit
+`.env`. It is intentionally ignored by Git.
+
+Required and commonly used settings include:
+
+```dotenv
+APP_ENV=local
+DEBUG=True
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/podclub
+DATABASE_URL_TEST=postgresql://postgres:postgres@localhost:5432/podclub_test
+JWT_SECRET_KEY=replace-this-with-a-long-random-secret
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_SECONDS=18000
+CORS_ORIGINS=["http://localhost:3000","http://localhost:5173"]
+
+SUPERADMIN_NAME=Super Admin
+SUPERADMIN_EMAIL=admin@podclub.io
+SUPERADMIN_PASSWORD=AdminPassword123!
+```
+
+`JWT_SECRET_KEY` must not remain `not-secret-key` outside `APP_ENV=local`.
+`DATABASE_URL` and `DATABASE_URL_TEST` must use a localhost PostgreSQL server,
+not a Unix socket.
+
+## Database Setup
+
+Before applying migrations to an existing database, back it up. Do not run
+migrations against an existing database without preserving or intentionally
+upgrading its data.
+
+PowerShell and bash:
+
+```powershell
+alembic upgrade head
+```
+
+```bash
+alembic upgrade head
+```
+
+To inspect migration state:
+
+```powershell
+alembic current
+alembic heads
+alembic check
+```
+
+```bash
+alembic current
+alembic heads
+alembic check
+```
+
+## Seed
+
+Create or reconcile the built-in platform roles and permissions:
+
+```powershell
+python -m app.commands.seed
+```
+
+```bash
+python -m app.commands.seed
+```
+
+Include demo users and club content:
+
+```powershell
+python -m app.commands.seed --dummy
+```
+
+```bash
+python -m app.commands.seed --dummy
+```
+
+The dummy accounts use the `@podclub.io` addresses shown at the end of the seed
+output and the password `Password123!`.
+
+To reconcile old permission names and system-role grants after a migration,
+first take a PostgreSQL backup and preview the reset:
+
+```powershell
+python -m app.commands.seed --reset-permissions
+```
+
+```bash
+python -m app.commands.seed --reset-permissions
+```
+
+This command asks for confirmation. For a non-interactive run:
+
+```powershell
+python -m app.commands.seed --reset-permissions --yes
+```
+
+```bash
+python -m app.commands.seed --reset-permissions --yes
+```
+
+The reset is destructive to obsolete permission rows and extra system-role grants.
+
+## Run the API
+
+The application entry point is `main.py` at the repository root.
+
+PowerShell:
+
+```powershell
+uvicorn main:app --reload
+```
+
+bash:
+
+```bash
+uvicorn main:app --reload
+```
+
+- API: `http://localhost:8000`
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+- Health check: `http://localhost:8000/health`
+
+## Authentication
+
+JWTs contain the user ID, issued-at time, and expiration. The token does not
+contain a role or permissions. Role and permissions are loaded from PostgreSQL
+for each authenticated request.
+
+- `POST /auth/register` creates a platform `user`
+- `POST /auth/login` accepts a username or email
+- `GET /auth/me` returns the user, role name, and permission names
+
+The login endpoint uses form data for Swagger and OAuth2 compatibility:
+
+```text
+username=<username-or-email>
+password=<password>
+```
+
+Unknown usernames, unknown emails, and wrong passwords return the same 401
+response.
+
+## Authorization Model
+
+PodClub distinguishes platform roles from club roles:
+
+- Platform roles: `super_admin`, `admin`, `user`
+- Club roles: `club_owner`, `club_moderator`, `club_member`
+
+Platform permissions are resolved from the user's platform role. Club operations
+also resolve the user's role in the requested club. The `super_admin` role
+system-wide bypasses permission checks.
+
+Club ownership and membership are enforced by request-scoped access checks.
+Content routes and member routes derive or require `podclub_id` from the API
+payload or resource instead of trusting a client identity field.
+
+## API Groups
+
+Main route groups include:
+
+- Authentication: `/auth`
+- Users and public profiles: `/users`
+- Roles and role permissions: `/roles`, `/role-permissions`
+- Permissions: `/permissions`
+- Clubs and club permissions: `/podclubs`
+- Club memberships: `/podclub-members`
+- Club bans: `/podclubs/{uid}/bans`
+- Invites: `/invites`
+- Podcasts and episodes: `/podcasts`, `/episodes`
+- Messages: `/messages`
+- Reports: `/reports`
+
+Client write schemas reject unknown fields. Identity and server-managed fields
+such as `owner_id`, `sender_id`, `creator_id`, `reporter_id`, `reviewed_by_id`,
+and invite tokens are not accepted from clients.
+
+## Postman
+
+A local Postman collection is stored under `postman/collections/PodClub API`.
+The collection is currently ignored by Git. The following collection variables
+are used between requests:
+
+- `base_url`
+- `token`
+- `podclub_id`
+- `podclub_uid`
+- `podcast_id`
+- `user_id`
+- `user_uid`
+- `member_uid`
+- `message_uid`
+- `episode_uid`
+- `invite_uid`
+- `report_uid`
+
+Suggested manual run order:
+
+1. Run the seed command.
+2. Log in as the super admin or an account with the required permissions.
+3. Create a PodClub.
+4. Add members or create podcasts and episodes.
+5. Run club-scoped message, invite, report, or ban requests.
+
+## Tests
+
+Tests require a real PostgreSQL test database configured as `DATABASE_URL_TEST`.
+The test database must be different from `DATABASE_URL`.
+
+PowerShell:
+
+```powershell
+python -m pytest tests
+```
+
+bash:
+
+```bash
+python -m pytest tests
+```
+
+Never use SQLite for the test database. PostgreSQL-only features and migrations
+are exercised with the real PostgreSQL engine.
+
+## Project Structure
+
+```text
 PodClub-Backend/
+├── alembic/                 Alembic environment and migrations
 ├── app/
-│   ├── __init__.py
-│   ├── models.py
-│   ├── routes.py
-│   ├── ...
-├── migrations/
-├── seed.py
+│   ├── commands/            Seed and administrative commands
+│   ├── core/                Configuration and permissions
+│   ├── crud/                Database operations
+│   ├── dependencies/        Authentication and access checks
+│   ├── handlers/            API exception handlers
+│   ├── models/              SQLAlchemy models
+│   ├── routes/              FastAPI route modules
+│   ├── schema/              Pydantic request and response models
+│   └── utils/               Shared validation and helpers
+├── tests/                   PostgreSQL-backed pytest suite
+├── main.py                  FastAPI application entry point
 ├── requirements.txt
-└── README.md
-- app/: Contains the application modules including initialization, models, and routes.
+└── alembic.ini
+```
 
-- migrations/: Contains database migration files managed by Flask-Migrate.
+## Development Notes
 
-- seed.py: Script to seed the database with initial data.
+- Use `pathlib` for filesystem paths.
+- Keep `.env` local and commit `.env.example`.
+- Preserve the `main.py` location at the repository root.
+- Run PostgreSQL on `localhost:5432` on Windows and Ubuntu.
+- Do not add a guest role or guest table.
+- Phase 1B is authorization and membership scope. Out-of-scope features include
+  WebSockets, Cloudinary, Docker, Render, and role-scope redesign.
 
-- requirements.txt: List of Python dependencies.
+## License
 
-- README.md: This file.
-
-## Models
-### User
-Represents a user in the system.
-
-- id: Integer, primary key.
-
-- username: String, unique, required.
-
-- email: String, unique, required.
-
-- password_hash: String, required.
-
-- role: String, required (e.g., 'user', 'admin').
-
-- is_banned: Boolean, default is False.
-
-- created_at: DateTime, default is current timestamp.
-
-### Report
-Represents a report made by a user against another user.
-
-- id: Integer, primary key.
-
-- user_id: Integer, foreign key referencing users.id, required.
-
-- reported_user_id: Integer, foreign key referencing users.id, required.
-
-- reason: String, required, at least 10 characters.
-
-- created_at: DateTime, default is current timestamp.
-
-### Channel
-Represents a discussion channel.
-
-- id: Integer, primary key.
-
-- name: String, required.
-
-- description: String.
-
-- created_at: DateTime, default is current timestamp.
-
-- owner_id: Integer, foreign key referencing users.id, required.
-
-### Message
-Represents a message sent in a channel.
-
-- id: Integer, primary key.
-
-- content: String, required.
-
-- sender_id: Integer, foreign key referencing users.id, required.
-
-- channel_id: Integer, foreign key referencing channels.id, required.
-
-- created_at: DateTime, default is current timestamp.
-
-### API Endpoints
-#### User Endpoints
-- POST /users: Create a new user.
-
-- GET /users/<id>: Retrieve a user by ID.
-
-- PUT /users/<id>: Update a user's information.
-
-- DELETE /users/<id>: Delete a user.
-
-### Channel Endpoints
-- POST /channels: Create a new channel.
-
-- GET /channels/<id>: Retrieve a channel by ID.
-
-- PUT /channels/<id>: Update a channel's information.
-
-- DELETE /channels/<id>: Delete a channel.
-
-### Message Endpoints
-- POST /messages: Create a new message.
-
-- GET /messages/<id>: Retrieve a message by ID.
-
-- PUT /messages/<id>: Update a message's content.
-
-- DELETE /messages/<id>: Delete a message.
-
-### Report Endpoints
-- POST /reports: Create a new report.
-
-- GET /reports/<id>: Retrieve a report by ID.
-
-- PUT /reports/<id>: Update a report's information.
-
-- DELETE /reports/<id>: Delete a report.
-
-### Contribution Guidelines
-1. Fork the repository.
-
-2. Create a new branch (git checkout -b feature-branch).
-
-3. Make your changes.
-
-4. Commit your changes (git commit -m 'Add new feature').
-
-5. Push to the branch (git push origin feature-branch).
-
-6. Open a pull request.
-
-### License
-licensed by MIT 
+MIT

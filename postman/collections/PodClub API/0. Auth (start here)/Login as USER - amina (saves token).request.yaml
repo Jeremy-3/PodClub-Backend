@@ -1,0 +1,18 @@
+$kind: http-request
+url: "{{base_url}}/auth/login"
+method: POST
+body:
+  type: urlencoded
+  content:
+    username: amina
+    password: Password123!
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    code: |-
+      const r = pm.response.json();
+      pm.test("login ok", () => pm.response.to.have.status(200));
+      pm.collectionVariables.set("token", r.access_token);
+    language: text/javascript
+order: 4000

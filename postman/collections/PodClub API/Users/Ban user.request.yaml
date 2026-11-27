@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{base_url}}/users/{{user_uid}}/ban"
+method: POST
+order: 7000

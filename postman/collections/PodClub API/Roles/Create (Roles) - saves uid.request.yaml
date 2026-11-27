@@ -1,0 +1,25 @@
+$kind: http-request
+url: "{{base_url}}/roles"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "postman_{{$timestamp}}_role",
+      "active": true,
+      "scope": "platform"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("status ok", () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));
+      const d = pm.response.json().data;
+      if (d && d.uid) { pm.collectionVariables.set("uid", d.uid); }
+      if (d && d.id) {
+        pm.collectionVariables.set("id", d.id);
+        pm.collectionVariables.set("role_id", d.id);
+      }
+    language: text/javascript
+order: 2000

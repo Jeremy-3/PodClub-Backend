@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{base_url}}/podclubs/{{podclub_uid}}/bans"
+method: GET
+order: 2000

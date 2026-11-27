@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{base_url}}/podclub-members/{{uid}}"
+method: DELETE
+order: 5000

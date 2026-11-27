@@ -1,0 +1,18 @@
+$kind: http-request
+url: "{{base_url}}/podclubs/{{podclub_uid}}/bans"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "user_id": {{user_id}},
+      "reason": "Banned from this PodClub"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("ban created", () => pm.response.to.have.status(200));
+    language: text/javascript
+order: 1000

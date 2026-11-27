@@ -1,0 +1,16 @@
+$kind: http-request
+url: "{{base_url}}/role-permissions/assign"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "role_id": 3,
+      "permissions_id": [
+        1,
+        2
+      ]
+    }
+order: 2000

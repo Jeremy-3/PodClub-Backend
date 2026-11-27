@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{base_url}}/users/me"
+method: PUT
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "username": "profile_{{$timestamp}}"
+    }
+order: 5000

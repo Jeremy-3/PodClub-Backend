@@ -1,0 +1,11 @@
+$kind: http-request
+name: "EXPECT 401: no token at all"
+url: "{{base_url}}/podclubs"
+method: GET
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    code: pm.test("401 unauthorized", () => pm.response.to.have.status(401));
+    language: text/javascript
+order: 4000

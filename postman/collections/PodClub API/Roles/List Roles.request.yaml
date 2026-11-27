@@ -1,0 +1,7 @@
+$kind: http-request
+url: "{{base_url}}/roles?page=1&limit=10"
+method: GET
+queryParams:
+  page: "1"
+  limit: "10"
+order: 1000

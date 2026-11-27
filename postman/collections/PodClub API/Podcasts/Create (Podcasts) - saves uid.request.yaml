@@ -1,0 +1,28 @@
+$kind: http-request
+url: "{{base_url}}/podcasts"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "podclub_id": {{podclub_id}},
+      "title": "Postman Podcast",
+      "description": "demo"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("status ok", () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));
+      const d = pm.response.json().data;
+      if (d && d.uid) {
+        pm.collectionVariables.set("uid", d.uid);
+        pm.collectionVariables.set("podcast_uid", d.uid);
+      }
+      if (d && d.id) {
+        pm.collectionVariables.set("id", d.id);
+        pm.collectionVariables.set("podcast_id", d.id);
+      }
+    language: text/javascript
+order: 2000

@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{base_url}}/permissions/{{uid}}"
+method: PUT
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "description": "edited"
+    }
+order: 4000

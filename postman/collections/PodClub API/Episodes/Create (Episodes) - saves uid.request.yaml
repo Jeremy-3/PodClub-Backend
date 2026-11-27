@@ -1,0 +1,26 @@
+$kind: http-request
+url: "{{base_url}}/episodes"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "podcast_id": {{podcast_id}},
+      "title": "Episode 1",
+      "audio_url": "https://example.com/audio/sample.mp3",
+      "duration": 600
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("status ok", () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));
+      const d = pm.response.json().data;
+      if (d && d.uid) {
+        pm.collectionVariables.set("uid", d.uid);
+        pm.collectionVariables.set("episode_uid", d.uid);
+      }
+      if (d && d.id) { pm.collectionVariables.set("episode_id", d.id); }
+    language: text/javascript
+order: 2000

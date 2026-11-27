@@ -1,0 +1,27 @@
+$kind: collection
+description: "Run the seed command first, then log in. Platform user actions and global report management require an admin token; role and permission management requires super_admin. Club-scoped operations require the appropriate club role, and club owners can review reports for their club. Create a club first and use the saved podclub_id/podclub_uid variables for club-scoped requests."
+variables:
+  base_url: http://localhost:8000
+  token: ""
+  uid: ""
+  id: ""
+  podclub_id: ""
+  podclub_uid: ""
+  podcast_id: ""
+  podcast_uid: ""
+  user_id: ""
+  user_uid: ""
+  member_uid: ""
+  message_uid: ""
+  episode_uid: ""
+  episode_id: ""
+  invite_uid: ""
+  report_uid: ""
+  role_id: ""
+  user_role_id: "3"
+auth:
+  - id: 4bb6cf84-e18c-452c-900f-12a8ebf05934
+    type: bearer
+    name: bearer auth
+    credentials:
+      token: "{{token}}"

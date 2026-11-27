@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{base_url}}/reports/{{uid}}"
+method: PUT
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "status": "reviewed"
+    }
+order: 4000
