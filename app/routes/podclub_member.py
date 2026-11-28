@@ -49,7 +49,7 @@ def _require_club_permission(access: Access, club: PodClubs, permission: str) ->
 
 
 def _get_member(db: Session, uid: UUID) -> PodClubMembers:
-    member = crud_podclub_member.get_record_by_field(db, "uid", uid)
+    member = crud_podclub_member.get_with_briefs(db, uid)
     if member is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -119,6 +119,7 @@ def get_all_podclub_members(
         db,
         page=page,
         limit=limit,
+        relationships=["user", "role"],
         filters=[{"field": "podclub_id", "value": podclub_id}],
     )
     return ResponseModel(

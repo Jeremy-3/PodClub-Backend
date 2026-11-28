@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.schema.brief import UserBrief
+
 
 class PodClubBase(BaseModel):
     name: str
@@ -35,7 +37,9 @@ class PodClubOut(PodClubBase):
     id: int
     uid: UUID
     owner_id: Optional[int] = None
+    owner: Optional[UserBrief] = None
     my_role: Optional[Literal["club_owner", "club_moderator", "club_member"]] = None
+    member_count: int = 0
     created_at: datetime
     updated_at: datetime
 

@@ -1,5 +1,5 @@
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.crud.base import CRUDBase
 from app.models.podclub_members import PodClubMembers
@@ -18,6 +18,14 @@ class CRUDPodClubMember(CRUDBase[MODEL, PodClubMemberCreate]):
         return (
             db.query(MODEL)
             .filter(MODEL.podclub_id == podclub_id, MODEL.user_id == user_id)
+            .first()
+        )
+
+    def get_with_briefs(self, db: Session, uid) -> PodClubMembers | None:
+        return (
+            db.query(MODEL)
+            .options(joinedload(MODEL.user), joinedload(MODEL.role))
+            .filter(MODEL.uid == uid)
             .first()
         )
 

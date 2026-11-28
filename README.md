@@ -239,6 +239,8 @@ Main route groups include:
 - Podcasts and episodes: `/podcasts`, `/episodes`
 - Messages: `/messages`
 - Reports: `/reports`
+- Upload signing: `/uploads`
+- Admin statistics: `/admin`
 
 Client write schemas reject unknown fields. Identity and server-managed fields
 such as `owner_id`, `sender_id`, `creator_id`, `reporter_id`, `reviewed_by_id`,
@@ -270,6 +272,31 @@ Suggested manual run order:
 3. Create a PodClub.
 4. Add members or create podcasts and episodes.
 5. Run club-scoped message, invite, report, or ban requests.
+
+## API Contract and Uploads
+
+The machine-readable API contract is in [docs/openapi.json](docs/openapi.json).
+Regenerate it with:
+
+PowerShell:
+
+```powershell
+python -m app.commands.export_openapi
+```
+
+bash:
+
+```bash
+python -m app.commands.export_openapi
+```
+
+The browser upload flow, plain-fetch example, private-club media limitation,
+and WebSocket contract are documented in [docs/API.md](docs/API.md).
+
+Media uploads use signed Supabase Storage URLs created by the FastAPI server.
+The browser never receives or uses the Supabase service-role key. Private-club
+media in the public bucket is unlisted rather than secret: an object URL reveals
+the file to anyone who obtains it.
 
 ## Tests
 
@@ -305,7 +332,11 @@ PodClub-Backend/
 │   ├── models/              SQLAlchemy models
 │   ├── routes/              FastAPI route modules
 │   ├── schema/              Pydantic request and response models
+│   ├── services/            Supabase media and WebSocket services
 │   └── utils/               Shared validation and helpers
+├── docs/
+│   ├── API.md               Upload and WebSocket API guide
+│   └── openapi.json         Generated OpenAPI contract
 ├── tests/                   PostgreSQL-backed pytest suite
 ├── main.py                  FastAPI application entry point
 ├── requirements.txt
@@ -319,8 +350,8 @@ PodClub-Backend/
 - Preserve the `main.py` location at the repository root.
 - Run PostgreSQL on `localhost:5432` on Windows and Ubuntu.
 - Do not add a guest role or guest table.
-- Phase 1B is authorization and membership scope. Out-of-scope features include
-  WebSockets, Cloudinary, Docker, Render, and role-scope redesign.
+- Supabase Auth, Realtime, PostgREST, private media buckets, orphan cleanup,
+  and server-side audio-duration extraction are not used in this API.
 
 ## License
 

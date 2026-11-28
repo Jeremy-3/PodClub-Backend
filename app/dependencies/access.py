@@ -1,4 +1,5 @@
 from fastapi import Depends, HTTPException, status
+from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -135,9 +136,71 @@ class Access:
 
     def visible_club_ids(self) -> set[int]:
         if self._visible_club_ids is None:
-            clubs = self.db.query(PodClubs).all()
+            query = self.db.query(PodClubs.id)
+            if self.user is None:
+                query = query.filter(
+                    PodClubs.is_active.is_(True),
+                    PodClubs.is_private.is_(False),
+                )
+            else:
+                role = self.user.role
+                is_super_admin = (
+                    role is not None
+                    and role.active
+                    and role.scope == RoleScope.PLATFORM
+                    and role.name == "super_admin"
+                )
+                if is_super_admin or "club.read_private" in self.platform_perms:
+                    self._visible_club_ids = frozenset(
+                        club_id for (club_id,) in query.all()
+                    )
+                    return set(self._visible_club_ids)
+
+                member_role_ids = (
+                    select(PodClubMembers.podclub_id)
+                    .join(Roles, Roles.id == PodClubMembers.role_id)
+                    .join(RolePermission, RolePermission.role_id == Roles.id)
+                    .join(
+                        Permissions,
+                        Permissions.id == RolePermission.permission_id,
+                    )
+                    .where(
+                        PodClubMembers.user_id == self.user.id,
+                        Roles.active.is_(True),
+                        Roles.scope == RoleScope.CLUB,
+                        Permissions.name == "club.read_private",
+                    )
+                )
+                owner_role_ids = (
+                    select(Roles.id)
+                    .join(RolePermission, RolePermission.role_id == Roles.id)
+                    .join(
+                        Permissions,
+                        Permissions.id == RolePermission.permission_id,
+                    )
+                    .where(
+                        Roles.name == "club_owner",
+                        Roles.active.is_(True),
+                        Roles.scope == RoleScope.CLUB,
+                        Permissions.name == "club.read_private",
+                    )
+                )
+                owner_has_permission = exists(owner_role_ids)
+                query = query.filter(
+                    or_(
+                        and_(
+                            PodClubs.is_active.is_(True),
+                            PodClubs.is_private.is_(False),
+                        ),
+                        PodClubs.id.in_(member_role_ids),
+                        and_(
+                            PodClubs.owner_id == self.user.id,
+                            owner_has_permission,
+                        ),
+                    )
+                )
             self._visible_club_ids = frozenset(
-                club.id for club in clubs if self.club_visible(club)
+                club_id for (club_id,) in query.all()
             )
         return set(self._visible_club_ids)
 

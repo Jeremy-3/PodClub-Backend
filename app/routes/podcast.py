@@ -12,8 +12,19 @@ from app.models.podclubs import PodClubs
 from app.models.podcasts import Podcasts
 from app.schema.podcast import PodcastCreate, PodcastOut, PodcastUpdate
 from app.schema.response import ResponseModel
+from app.services.media import delete_object, extract_object_path, validate_media_reference
 
 router = APIRouter(prefix="/podcasts", tags=["Podcasts"])
+
+
+def _podcast_out(
+    db: Session, podcast: Podcasts, episode_count: int | None = None
+) -> PodcastOut:
+    if episode_count is None:
+        episode_count = crud_podcast.get_episode_count(db, podcast.id)
+    return PodcastOut.model_validate(podcast).model_copy(
+        update={"episode_count": episode_count}
+    )
 
 
 def _get_visible_club(db: Session, access: Access, podclub_id: int) -> PodClubs:
@@ -59,10 +70,26 @@ def create_podcast(
             detail="Not authenticated",
         )
 
+    create_payload = payload
+    if payload.cover_url is not None:
+        create_payload = payload.model_copy(
+            update={
+                "cover_url": validate_media_reference(
+                    "club_cover",
+                    payload.cover_url,
+                    access.user.id,
+                    club.id,
+                )
+            }
+        )
+
     podcast = crud_podcast.create_podcast(
-        db, payload, creator_id=access.user.id
+        db, create_payload, creator_id=access.user.id
     )
-    return ResponseModel(data=podcast, message="Podcast created successfully")
+    return ResponseModel(
+        data=_podcast_out(db, podcast, episode_count=0),
+        message="Podcast created successfully",
+    )
 
 
 @router.get("", response_model=ResponseModel[list[PodcastOut]])
@@ -73,21 +100,18 @@ def get_all_podcasts(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
 ):
-    if podclub_id is None:
-        club_ids = access.visible_club_ids()
-        filters = [{"field": "podclub_id", "op": "in", "value": club_ids}]
-    else:
+    if podclub_id is not None:
         _get_visible_club(db, access, podclub_id)
-        filters = [{"field": "podclub_id", "value": podclub_id}]
 
-    podcasts, total = crud_podcast.read(
+    podcasts, total = crud_podcast.read_for_clubs(
         db,
+        club_ids=access.visible_club_ids(),
+        podclub_id=podclub_id,
         page=page,
         limit=limit,
-        filters=filters,
     )
     return ResponseModel(
-        data=podcasts,
+        data=[_podcast_out(db, podcast, count) for podcast, count in podcasts],
         total=total,
         message="Podcasts retrieved successfully",
     )
@@ -101,7 +125,10 @@ def get_podcast(
 ):
     podcast = _get_podcast(db, uid)
     _get_podcast_club(db, access, podcast)
-    return ResponseModel(data=podcast, message="Podcast retrieved successfully")
+    return ResponseModel(
+        data=_podcast_out(db, podcast),
+        message="Podcast retrieved successfully",
+    )
 
 
 @router.put("/{uid}", response_model=ResponseModel[PodcastOut])
@@ -114,9 +141,29 @@ def update_podcast(
     podcast = _get_podcast(db, uid)
     club = _get_podcast_club(db, access, podcast)
     access.require(PODCAST_UPDATE, club)
-    updated_podcast = crud_podcast.update_podcast(db, uid, payload)
+    update_payload = payload
+    if payload.cover_url is not None:
+        old_url = podcast.cover_url
+        update_payload = payload.model_copy(
+            update={
+                "cover_url": validate_media_reference(
+                    "club_cover",
+                    payload.cover_url,
+                    podcast.creator_id or access.user.id,
+                    club.id,
+                )
+            }
+        )
+    else:
+        old_url = None
+
+    updated_podcast = crud_podcast.update_podcast(db, uid, update_payload)
+    if old_url and old_url != updated_podcast.cover_url:
+        path = extract_object_path(old_url)
+        if path is not None:
+            delete_object(path)
     return ResponseModel(
-        data=updated_podcast,
+        data=_podcast_out(db, updated_podcast),
         message="Podcast updated successfully",
     )
 
@@ -130,5 +177,10 @@ def delete_podcast(
     podcast = _get_podcast(db, uid)
     club = _get_podcast_club(db, access, podcast)
     access.require(PODCAST_DELETE, club)
+    cover_url = podcast.cover_url
     crud_podcast.delete_podcast(db, uid)
+    if cover_url:
+        path = extract_object_path(cover_url)
+        if path is not None:
+            delete_object(path)
     return ResponseModel(message="Podcast deleted successfully")

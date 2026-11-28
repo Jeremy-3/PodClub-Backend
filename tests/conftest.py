@@ -46,7 +46,13 @@ def test_engine():
     ):
         raise RuntimeError("DATABASE_URL_TEST must not point to the application database")
 
-    engine = create_engine(settings.DATABASE_URL_TEST, pool_pre_ping=True)
+    engine = create_engine(
+        settings.DATABASE_URL_TEST,
+        pool_pre_ping=True,
+        pool_recycle=300,
+        pool_size=5,
+        max_overflow=5,
+    )
     if engine.dialect.name != "postgresql":
         engine.dispose()
         raise RuntimeError("Tests require PostgreSQL; SQLite is not supported")

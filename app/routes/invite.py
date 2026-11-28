@@ -1,16 +1,28 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.perm_names import MEMBER_INVITE
+from app.core.rate_limit import limiter
 from app.crud.invite import crud_invite
 from app.crud.podclub import crud_podclub
 from app.db.session import get_db
 from app.dependencies.access import Access, get_access
+from app.dependencies.auth import get_current_user
 from app.models.invites import Invites
 from app.models.podclubs import PodClubs
-from app.schema.invite import InviteCreate, InviteOut, InviteUpdate
+from app.models.users import Users
+from app.schema.invite import (
+    InviteAcceptIn,
+    InviteCreate,
+    InviteOut,
+    InvitePreviewOut,
+    InviteUpdate,
+)
+from app.schema.podclub_member import PodClubMemberOut
 from app.schema.response import ResponseModel
 
 router = APIRouter(prefix="/invites", tags=["Invites"])
@@ -41,6 +53,69 @@ def _require_invite_access(db: Session, access: Access, uid: UUID) -> Invites:
     club = _get_visible_club(db, access, invite.podclub_id)
     access.require(MEMBER_INVITE, club)
     return invite
+
+
+@router.get(
+    "/preview/{token}",
+    response_model=ResponseModel[InvitePreviewOut],
+)
+@limiter.limit(settings.INVITE_PREVIEW_RATE_LIMIT)
+def preview_invite(
+    request: Request,
+    token: str,
+    db: Session = Depends(get_db),
+):
+    invite = crud_invite.get_by_token(db, token)
+    if invite is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invite not found",
+        )
+    if invite.expires_at <= datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Invite has expired",
+        )
+    if invite.max_uses > 0 and invite.use_count >= invite.max_uses:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Invite has no remaining uses",
+        )
+    if invite.podclub is None or not invite.podclub.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="PodClub not found",
+        )
+
+    remaining_uses = (
+        max(invite.max_uses - invite.use_count, 0)
+        if invite.max_uses > 0
+        else None
+    )
+    return ResponseModel(
+        data=InvitePreviewOut(
+            podclub=invite.podclub,
+            expires_at=invite.expires_at,
+            remaining_uses=remaining_uses,
+        ),
+        message="Invite preview retrieved successfully",
+    )
+
+
+@router.post(
+    "/accept",
+    response_model=ResponseModel[PodClubMemberOut],
+)
+def accept_invite(
+    payload: InviteAcceptIn,
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    member = crud_invite.accept_invite(db, payload.token, current_user)
+    return ResponseModel(
+        data=member,
+        message="PodClub invite accepted successfully",
+    )
 
 
 @router.post("", response_model=ResponseModel[InviteOut])

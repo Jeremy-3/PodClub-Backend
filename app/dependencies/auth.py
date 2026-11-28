@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 import jwt
@@ -26,9 +28,11 @@ def _get_user_from_token(token: str, db: Session) -> Users:
             algorithms=[settings.JWT_ALGORITHM],
         )
         raw_sub = payload.get("sub")
-        if not raw_sub:
+        raw_iat = payload.get("iat")
+        if not raw_sub or raw_iat is None:
             raise credentials_exception
         user_id = int(raw_sub)
+        issued_at = int(raw_iat)
     except (jwt.PyJWTError, ValueError):
         raise credentials_exception
 
@@ -58,6 +62,19 @@ def _get_user_from_token(token: str, db: Session) -> Users:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is banned",
         )
+
+    if user.password_changed_at is not None:
+        password_changed_at = user.password_changed_at
+        if password_changed_at.tzinfo is None:
+            password_changed_at = password_changed_at.replace(tzinfo=timezone.utc)
+        else:
+            password_changed_at = password_changed_at.astimezone(timezone.utc)
+        if issued_at < int(password_changed_at.timestamp()):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token no longer valid",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
     return user
 

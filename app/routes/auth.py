@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.core.rate_limit import limiter
 from app.core.security import create_access_token, verify_password
 from app.crud.role import crud_role
 from app.crud.role_permission import crud_role_permission
@@ -18,7 +20,12 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/register", response_model=ResponseModel[UserOut])
-def register(payload: RegisterIn, db: Session = Depends(get_db)):
+@limiter.limit(settings.REGISTER_RATE_LIMIT)
+def register(
+    request: Request,
+    payload: RegisterIn,
+    db: Session = Depends(get_db),
+):
     role = crud_role.get_record_by_field(db, "name", "user")
     if role is None or role.scope != RoleScope.PLATFORM:
         raise HTTPException(
@@ -34,7 +41,9 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
 
 
 @router.post("/login")
+@limiter.limit(settings.LOGIN_RATE_LIMIT)
 def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:

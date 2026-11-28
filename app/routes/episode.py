@@ -1,3 +1,4 @@
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -20,6 +21,8 @@ from app.models.podclubs import PodClubs
 from app.models.podcasts import Podcasts
 from app.schema.episode import EpisodeCreate, EpisodeOut, EpisodeUpdate
 from app.schema.response import ResponseModel
+from app.services.media import validate_media_reference, delete_object
+from app.services.websockets import connection_manager
 
 router = APIRouter(prefix="/episodes", tags=["Episodes"])
 
@@ -63,7 +66,7 @@ def _get_episode_club(
 
 
 @router.post("", response_model=ResponseModel[EpisodeOut])
-def create_episode(
+async def create_episode(
     payload: EpisodeCreate,
     db: Session = Depends(get_db),
     access: Access = Depends(get_access),
@@ -87,10 +90,30 @@ def create_episode(
             detail="Not authenticated",
         )
 
+    if payload.audio_url:
+        payload = payload.model_copy(
+            update={
+                "audio_url": validate_media_reference(
+                    "audio",
+                    payload.audio_url,
+                    access.user.id,
+                    club.id,
+                ),
+                "duration": max(1, min(21600, payload.duration)),
+            }
+        )
+
     episode = crud_episode.create_episode(
         db,
         payload,
         created_by_id=access.user.id,
+    )
+    await connection_manager.broadcast(
+        f"podclub:{club.id}",
+        {
+            "type": "episode.created",
+            "data": EpisodeOut.model_validate(episode).model_dump(mode="json"),
+        },
     )
     return ResponseModel(data=episode, message="Episode created successfully")
 
@@ -101,12 +124,27 @@ def get_all_episodes(
     access: Access = Depends(get_access),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
+    podclub_id: int | None = Query(None, ge=1),
+    podcast_id: int | None = Query(None, ge=1),
+    search: str | None = Query(None, max_length=100),
+    sort: Literal["newest"] = Query("newest"),
 ):
+    visible_club_ids = access.visible_club_ids()
+    if podclub_id is not None:
+        club = crud_podclub.get(db, podclub_id)
+        if club is None or not access.club_visible(club):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="PodClub not found",
+            )
     episodes, total = crud_episode.read_for_clubs(
         db,
-        club_ids=access.visible_club_ids(),
+        club_ids=visible_club_ids,
         page=page,
         limit=limit,
+        podclub_id=podclub_id,
+        podcast_id=podcast_id,
+        search=search,
     )
     return ResponseModel(
         data=episodes,
@@ -127,7 +165,7 @@ def get_episode(
 
 
 @router.put("/{uid}", response_model=ResponseModel[EpisodeOut])
-def update_episode(
+async def update_episode(
     uid: UUID,
     payload: EpisodeUpdate,
     db: Session = Depends(get_db),
@@ -149,7 +187,36 @@ def update_episode(
             ),
         )
 
-    updated_episode = crud_episode.update_episode(db, uid, payload)
+    update_payload = payload
+    old_url = episode.audio_url
+    if payload.audio_url is not None:
+        update_payload = update_payload.model_copy(
+            update={
+                "audio_url": validate_media_reference(
+                    "audio",
+                    payload.audio_url,
+                    episode.created_by_id or access.user.id,
+                    club.id,
+                )
+            }
+        )
+    if payload.duration is not None:
+        update_payload = update_payload.model_copy(
+            update={"duration": max(1, min(21600, payload.duration))}
+        )
+
+    updated_episode = crud_episode.update_episode(db, uid, update_payload)
+    if old_url and payload.audio_url is not None and old_url != updated_episode.audio_url:
+        path = extract_object_path(old_url)
+        if path is not None:
+            delete_object(path)
+    await connection_manager.broadcast(
+        f"podclub:{club.id}",
+        {
+            "type": "episode.updated",
+            "data": EpisodeOut.model_validate(updated_episode).model_dump(mode="json"),
+        },
+    )
     return ResponseModel(
         data=updated_episode,
         message="Episode updated successfully",
@@ -157,7 +224,7 @@ def update_episode(
 
 
 @router.delete("/{uid}", response_model=ResponseModel[None])
-def delete_episode(
+async def delete_episode(
     uid: UUID,
     db: Session = Depends(get_db),
     access: Access = Depends(get_access),
@@ -178,5 +245,15 @@ def delete_episode(
             ),
         )
 
+    audio_url = episode.audio_url
     crud_episode.delete_episode(db, uid)
+    from app.services.media import extract_object_path
+
+    path = extract_object_path(audio_url)
+    if path is not None:
+        delete_object(path)
+    await connection_manager.broadcast(
+        f"podclub:{club.id}",
+        {"type": "episode.deleted", "data": {"id": episode.id, "uid": str(episode.uid)}},
+    )
     return ResponseModel(message="Episode deleted successfully")

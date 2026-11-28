@@ -2,7 +2,9 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+from app.schema.brief import UserBrief
 
 # from app.schema.user import UserOut
 # from app.schema.podclub import PodClubOut
@@ -34,5 +36,12 @@ class PodClubMemberOut(PodClubMemberBase):
     joined_at: datetime
     created_at: datetime
     updated_at: datetime
+    user: UserBrief
+    role: str
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def role_name(cls, value):
+        return value.name if hasattr(value, "name") else value
 
     model_config = {"from_attributes": True}

@@ -2,13 +2,15 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
+
+from app.schema.brief import ClubBrief
 
 
 class InviteBase(BaseModel):
     podclub_id: Optional[int] = None
     email: EmailStr
-    max_uses: int = 0
+    max_uses: int = Field(default=0, ge=0, description="0 means unlimited")
 
 
 class InviteCreate(InviteBase):
@@ -26,9 +28,23 @@ class InviteCreateDB(InviteCreate):
 
 class InviteUpdate(BaseModel):
     expires_at: Optional[datetime] = None
-    max_uses: Optional[int] = None
+    max_uses: Optional[int] = Field(
+        default=None, ge=0, description="0 means unlimited"
+    )
 
     model_config = {"extra": "forbid"}
+
+
+class InviteAcceptIn(BaseModel):
+    token: str = Field(min_length=16, max_length=512)
+
+    model_config = {"extra": "forbid"}
+
+
+class InvitePreviewOut(BaseModel):
+    podclub: ClubBrief
+    expires_at: datetime
+    remaining_uses: Optional[int] = None
 
 
 class InviteOut(InviteBase):

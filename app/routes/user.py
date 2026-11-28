@@ -3,8 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.crud.role import crud_role
-from app.crud.user import crud_user
+from app.core.security import create_access_token
 from app.core.perm_names import (
     ROLE_ADMIN,
     ROLE_SUPER_ADMIN,
@@ -15,19 +14,25 @@ from app.core.perm_names import (
     USER_VIEW_ONE,
     USERS_VIEW_ALL,
 )
+from app.crud.role import crud_role
+from app.crud.user import crud_user
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user
 from app.dependencies.rbac import require_permission
 from app.models.users import Users
 from app.models.roles import RoleScope
 from app.schema.response import ResponseModel
+from app.schema.brief import UserBrief
 from app.schema.user import (
     UserAdminUpdate,
     UserCreate,
     UserOut,
+    PasswordChangeIn,
+    PasswordChangeOut,
     UserProfileUpdate,
     UserPublicOut,
 )
+from app.services.media import delete_object, extract_object_path, validate_media_reference
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -84,8 +89,18 @@ def get_all_users(
     db: Session = Depends(get_db),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
+    search: str | None = Query(None, max_length=100),
+    role: str | None = Query(None, max_length=50),
+    banned: bool | None = Query(None),
 ):
-    users, total = crud_user.read(db, page=page, limit=limit)
+    users, total = crud_user.read_filtered(
+        db,
+        page=page,
+        limit=limit,
+        search=search,
+        role=role,
+        banned=banned,
+    )
     return ResponseModel(
         success=True, data=users, total=total, message="Users retrieved successfully"
     )
@@ -97,8 +112,60 @@ def update_my_profile(
     current_user: Users = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = crud_user.update_user_profile(db, current_user.uid, payload)
+    update_payload = payload
+    if payload.avatar_url is not None:
+        old_url = current_user.avatar_url
+        update_payload = payload.model_copy(
+            update={
+                "avatar_url": validate_media_reference(
+                    "avatar",
+                    payload.avatar_url,
+                    current_user.id,
+                )
+            }
+        )
+    else:
+        old_url = None
+
+    user = crud_user.update_user_profile(db, current_user.uid, update_payload)
+    if old_url and old_url != user.avatar_url:
+        path = extract_object_path(old_url)
+        if path is not None:
+            delete_object(path)
     return ResponseModel(data=user, message="Profile updated successfully")
+
+
+@router.post(
+    "/me/password",
+    response_model=ResponseModel[PasswordChangeOut],
+)
+def change_my_password(
+    payload: PasswordChangeIn,
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = crud_user.change_password(db, current_user, payload)
+    return ResponseModel(
+        data=PasswordChangeOut(access_token=create_access_token(user.id)),
+        message="Password changed successfully",
+    )
+
+
+@router.get(
+    "/search",
+    response_model=ResponseModel[list[UserBrief]],
+)
+def search_users(
+    q: str = Query(..., min_length=3, max_length=100),
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    users = crud_user.search_active_users(db, query_text=q, limit=10)
+    return ResponseModel(
+        data=[UserBrief.model_validate(user) for user in users],
+        total=len(users),
+        message="Users retrieved successfully",
+    )
 
 
 @router.get(

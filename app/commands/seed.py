@@ -326,6 +326,7 @@ def _seed_dummy_data(db: Session, roles: dict[str, Roles]) -> None:
             },
             {
                 "created_by_id": users[creator_name].id,
+                # Placeholder media URLs are intentionally external-only seed data.
                 "audio_url": (
                     "https://example.com/audio/"
                     f"{title.lower().replace(' ', '-')}.mp3"

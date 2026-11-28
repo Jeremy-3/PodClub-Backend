@@ -1,15 +1,21 @@
 from datetime import datetime, timezone
 from uuid import UUID
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
-from app.core.security import hash_password as generate_password_hash
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session, joinedload
+from app.core.security import (
+    hash_password as generate_password_hash,
+    verify_password,
+)
 from app.crud.base import CRUDBase
 from app.models.users import Users
+from app.models.roles import Roles
 from app.schema.auth import RegisterIn
 from app.schema.user import (
     UserAdminUpdate,
     UserCreate,
     UserCreateDB,
+    PasswordChangeIn,
     UserProfileUpdate,
 )
 
@@ -26,6 +32,64 @@ class CRUDUser(CRUDBase[MODEL, UserCreateDB]):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already registered",
             )
+
+    def read_filtered(
+        self,
+        db: Session,
+        page: int,
+        limit: int,
+        search: str | None = None,
+        role: str | None = None,
+        banned: bool | None = None,
+    ) -> tuple[list[Users], int]:
+        query = db.query(MODEL)
+        if search:
+            pattern = f"%{search}%"
+            query = query.filter(
+                or_(
+                    MODEL.username.ilike(pattern),
+                    MODEL.email.ilike(pattern),
+                )
+            )
+        if role:
+            query = query.join(Roles, MODEL.role_id == Roles.id).filter(
+                func.lower(Roles.name) == role.lower()
+            )
+        if banned is not None:
+            query = query.filter(
+                MODEL.banned_at.is_not(None)
+                if banned
+                else MODEL.banned_at.is_(None)
+            )
+
+        total = query.with_entities(func.count(MODEL.id)).scalar()
+        records = (
+            query.options(joinedload(MODEL.role))
+            .order_by(MODEL.created_at.desc())
+            .offset((page - 1) * limit)
+            .limit(limit)
+            .all()
+        )
+        return records, total
+
+    def search_active_users(
+        self, db: Session, query_text: str, limit: int = 10
+    ) -> list[Users]:
+        pattern = f"%{query_text}%"
+        return (
+            db.query(MODEL)
+            .filter(
+                MODEL.is_active.is_(True),
+                MODEL.banned_at.is_(None),
+                or_(
+                    MODEL.username.ilike(pattern),
+                    MODEL.email.ilike(pattern),
+                ),
+            )
+            .order_by(MODEL.username.asc(), MODEL.id.asc())
+            .limit(limit)
+            .all()
+        )
 
         if self.get_record_by_field(db, "username", username):
             raise HTTPException(
@@ -104,6 +168,27 @@ class CRUDUser(CRUDBase[MODEL, UserCreateDB]):
                 )
 
         return self.update(db, record, update_data)
+
+    def change_password(
+        self, db: Session, record: Users, payload: PasswordChangeIn
+    ) -> Users:
+        if not verify_password(payload.current_password, record.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is incorrect",
+            )
+        if verify_password(payload.new_password, record.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="New password must be different from the current password",
+            )
+
+        changed_at = datetime.now(timezone.utc).replace(microsecond=0)
+        record.password_hash = generate_password_hash(payload.new_password)
+        record.password_changed_at = changed_at
+        db.commit()
+        db.refresh(record)
+        return record
     
     
 

@@ -33,6 +33,7 @@ class Users(Base):
         Index("uq_users_email_lower", func.lower(email), unique=True),
     )
     password_hash = Column(String, nullable=False)
+    password_changed_at = Column(TIMESTAMP(timezone=True), nullable=True)
     avatar_url = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     banned_at = Column(TIMESTAMP(timezone=True), nullable=True)  # no default

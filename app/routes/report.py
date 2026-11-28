@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.perm_names import (
     REPORT_CREATE,
@@ -18,7 +18,7 @@ from app.crud.user import crud_user
 from app.db.session import get_db
 from app.dependencies.access import Access, get_access
 from app.models.podclubs import PodClubs
-from app.models.reports import Reports
+from app.models.reports import ReportStatus, Reports
 from app.schema.report import ReportCreate, ReportOut, ReportUpdate
 from app.schema.response import ResponseModel
 
@@ -36,7 +36,17 @@ def _get_visible_club(db: Session, access: Access, podclub_id: int) -> PodClubs:
 
 
 def _get_report(db: Session, uid: UUID) -> Reports:
-    report = crud_report.get_record_by_field(db, "uid", uid)
+    report = (
+        db.query(Reports)
+        .options(
+            joinedload(Reports.reporter),
+            joinedload(Reports.reported_user),
+            joinedload(Reports.message),
+            joinedload(Reports.podclub),
+        )
+        .filter(Reports.uid == uid)
+        .first()
+    )
     if report is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -117,14 +127,12 @@ def get_all_reports(
     db: Session = Depends(get_db),
     access: Access = Depends(get_access),
     podclub_id: int | None = Query(None, ge=1),
+    status_filter: ReportStatus | None = Query(None, alias="status"),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
 ):
-    filters = []
-    if access.can(REPORTS_VIEW_ALL):
-        if podclub_id is not None:
-            filters.append({"field": "podclub_id", "value": podclub_id})
-    else:
+    report_podclub_id = podclub_id
+    if not access.can(REPORTS_VIEW_ALL):
         if podclub_id is None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -132,13 +140,14 @@ def get_all_reports(
             )
         club = _get_visible_club(db, access, podclub_id)
         access.require(REPORT_REVIEW_CLUB, club)
-        filters.append({"field": "podclub_id", "value": club.id})
+        report_podclub_id = club.id
 
-    reports, total = crud_report.read(
+    reports, total = crud_report.read_filtered(
         db,
         page=page,
         limit=limit,
-        filters=filters,
+        podclub_id=report_podclub_id,
+        report_status=status_filter,
     )
     return ResponseModel(
         data=reports,

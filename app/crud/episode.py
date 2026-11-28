@@ -1,7 +1,8 @@
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.crud.base import CRUDBase
 from app.models.episodes import Episodes
@@ -25,7 +26,14 @@ class CRUDEpisode(CRUDBase[MODEL, EpisodeCreateDB]):
         return self.create(db, db_obj)
 
     def read_for_clubs(
-        self, db: Session, club_ids: set[int], page: int, limit: int
+        self,
+        db: Session,
+        club_ids: set[int],
+        page: int,
+        limit: int,
+        podclub_id: int | None = None,
+        podcast_id: int | None = None,
+        search: str | None = None,
     ) -> tuple[list[Episodes], int]:
         if not club_ids:
             return [], 0
@@ -35,9 +43,24 @@ class CRUDEpisode(CRUDBase[MODEL, EpisodeCreateDB]):
             .join(Podcasts, Podcasts.id == MODEL.podcast_id)
             .filter(Podcasts.podclub_id.in_(club_ids))
         )
-        total = query.count()
+        if podclub_id is not None:
+            query = query.filter(Podcasts.podclub_id == podclub_id)
+        if podcast_id is not None:
+            query = query.filter(MODEL.podcast_id == podcast_id)
+        if search:
+            query = query.filter(
+                or_(
+                    MODEL.title.ilike(f"%{search}%"),
+                    MODEL.description.ilike(f"%{search}%"),
+                )
+            )
+        total = query.with_entities(func.count(MODEL.id)).scalar()
         records = (
-            query.order_by(MODEL.created_at.desc())
+            query.options(
+                selectinload(MODEL.created_by),
+                joinedload(MODEL.podcast).joinedload(Podcasts.podclub),
+            )
+            .order_by(MODEL.created_at.desc())
             .offset((page - 1) * limit)
             .limit(limit)
             .all()

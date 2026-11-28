@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.crud.base import CRUDBase
 from app.models.reports import ReportStatus, Reports
@@ -13,6 +13,35 @@ MODEL = Reports
 
 class CRUDReport(CRUDBase[MODEL, ReportCreateDB]):
     """CRUD operations for Report model"""
+
+    def read_filtered(
+        self,
+        db: Session,
+        page: int,
+        limit: int,
+        podclub_id: int | None = None,
+        report_status: ReportStatus | None = None,
+    ) -> tuple[list[Reports], int]:
+        query = db.query(MODEL)
+        if podclub_id is not None:
+            query = query.filter(MODEL.podclub_id == podclub_id)
+        if report_status is not None:
+            query = query.filter(MODEL.status == report_status)
+
+        total = query.count()
+        records = (
+            query.options(
+                joinedload(MODEL.reporter),
+                joinedload(MODEL.reported_user),
+                joinedload(MODEL.message),
+                joinedload(MODEL.podclub),
+            )
+            .order_by(MODEL.created_at.desc())
+            .offset((page - 1) * limit)
+            .limit(limit)
+            .all()
+        )
+        return records, total
 
     def create_report(
         self,

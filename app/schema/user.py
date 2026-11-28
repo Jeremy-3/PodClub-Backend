@@ -51,6 +51,26 @@ class UserProfileUpdate(BaseModel):
     model_config = {"extra": "forbid"}
 
 
+class PasswordChangeIn(BaseModel):
+    current_password: str
+    new_password: str
+
+    model_config = {"extra": "forbid"}
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, value: str) -> str:
+        validate_password(value)
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("Password cannot exceed 72 bytes")
+        return value
+
+
+class PasswordChangeOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
 class UserAdminUpdate(BaseModel):
     role_id: Optional[int] = None
     is_active: Optional[bool] = None
