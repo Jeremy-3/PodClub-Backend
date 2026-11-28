@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: podclub-api
+    runtime: python
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_SECONDS
+        value: "18000"
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: CORS_ORIGIN_REGEX
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: podclub-media
+      - key: MAX_AUDIO_MB
+        value: "50"
+      - key: MAX_IMAGE_MB
+        value: "5"
+      - key: ALLOW_EXTERNAL_MEDIA_URLS
+        value: "false"
+      - key: SUPERADMIN_NAME
+        sync: false
+      - key: SUPERADMIN_EMAIL
+        sync: false
+      - key: SUPERADMIN_PASSWORD
+        sync: false
+    startCommand: alembic upgrade head && python -m app.commands.setup_storage && python -m app.commands.seed && gunicorn -k uvicorn.workers.UvicornWorker -w 1 main:app --bind 0.0.0.0:$PORT --forwarded-allow-ips="*"

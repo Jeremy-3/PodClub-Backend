@@ -298,6 +298,74 @@ The browser never receives or uses the Supabase service-role key. Private-club
 media in the public bucket is unlisted rather than secret: an object URL reveals
 the file to anyone who obtains it.
 
+## Deploy
+
+### Supabase checklist
+
+1. Create separate **dev** and **prod** Supabase projects.
+2. Open the database connection settings and copy the **Session Pooler**
+   connection string for each project. It uses port `5432`.
+3. URL-encode special characters in the database password.
+4. Do not use the transaction pooler on port `6543` for the app or migrations.
+5. Create or update the media bucket:
+
+   PowerShell:
+
+   ```powershell
+   python -m app.commands.setup_storage
+   ```
+
+   bash:
+
+   ```bash
+   python -m app.commands.setup_storage
+   ```
+
+6. Optionally disable Supabase Data API for the project. FastAPI remains the only
+   application API and uses the PostgreSQL session pooler directly.
+7. Run `python -m app.commands.check_rls` after migrations. It must print
+   `No public tables without RLS.`.
+
+The Supabase bucket is public and has the project plan's file-size limit.
+The application additionally caps audio at `MAX_AUDIO_MB` and images at
+`MAX_IMAGE_MB`; `MAX_AUDIO_MB` is not allowed to exceed the bucket limit.
+
+### Render
+
+[`render.yaml`](render.yaml) creates one long-running API process and no Render
+Postgres database. The start command migrates, configures Storage, seeds roles,
+permissions, and the super admin, then starts one Uvicorn worker.
+
+The dummy seed is prohibited in production. WebSocket state is held in process
+memory, so deployment must use exactly one worker. Multiple workers or replicas
+will not share connections or events.
+
+### Environment variables
+
+| Name | Required | Example |
+|---|---|---|
+| `APP_ENV` | Yes | `production` |
+| `JWT_SECRET_KEY` | Yes | Generate a long random secret |
+| `JWT_ALGORITHM` | No | `HS256` |
+| `ACCESS_TOKEN_EXPIRE_SECONDS` | No | `18000` |
+| `DATABASE_URL` | Yes | Supabase Session Pooler URL on port `5432` |
+| `CORS_ORIGINS` | Yes | `["https://app.example.com"]` |
+| `CORS_ORIGIN_REGEX` | No | `^https://.*\.vercel\.app$` |
+| `SUPABASE_URL` | Yes | `https://<project-ref>.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes, server only | Supabase service-role key |
+| `SUPABASE_STORAGE_BUCKET` | No | `podclub-media` |
+| `MAX_AUDIO_MB` | No | `50` |
+| `MAX_IMAGE_MB` | No | `5` |
+| `ALLOW_EXTERNAL_MEDIA_URLS` | No | `false` |
+| `SUPERADMIN_NAME` | Yes | `Super Admin` |
+| `SUPERADMIN_EMAIL` | Yes | `admin@example.com` |
+| `SUPERADMIN_PASSWORD` | Yes | Long random password |
+| `ENABLE_DOCS` | No | `false` in production if Swagger should be hidden |
+
+Supabase keys must never be placed in Vercel/frontend environment variables or
+returned by API responses. Only the service-role key is needed by this backend;
+plain browser uploads use the server-signed URL and do not require a public key.
+
 ## Tests
 
 Tests require a real PostgreSQL test database configured as `DATABASE_URL_TEST`.

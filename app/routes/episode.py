@@ -21,7 +21,11 @@ from app.models.podclubs import PodClubs
 from app.models.podcasts import Podcasts
 from app.schema.episode import EpisodeCreate, EpisodeOut, EpisodeUpdate
 from app.schema.response import ResponseModel
-from app.services.media import validate_media_reference, delete_object
+from app.services.media import (
+    clamp_audio_duration,
+    validate_media_reference,
+    delete_object,
+)
 from app.services.websockets import connection_manager
 
 router = APIRouter(prefix="/episodes", tags=["Episodes"])
@@ -99,7 +103,7 @@ async def create_episode(
                     access.user.id,
                     club.id,
                 ),
-                "duration": max(1, min(21600, payload.duration)),
+                "duration": clamp_audio_duration(payload.duration),
             }
         )
 
@@ -202,7 +206,7 @@ async def update_episode(
         )
     if payload.duration is not None:
         update_payload = update_payload.model_copy(
-            update={"duration": max(1, min(21600, payload.duration))}
+            update={"duration": clamp_audio_duration(payload.duration)}
         )
 
     updated_episode = crud_episode.update_episode(db, uid, update_payload)

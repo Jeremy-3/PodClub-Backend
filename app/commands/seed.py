@@ -462,6 +462,8 @@ def main() -> None:
         help="Confirm --reset-permissions without an interactive prompt",
     )
     args = parser.parse_args()
+    if args.dummy and settings.APP_ENV == "production":
+        parser.error("--dummy refuses to run when APP_ENV=production")
     if args.yes and not args.reset_permissions:
         parser.error("--yes can only be used with --reset-permissions")
 

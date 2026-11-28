@@ -36,6 +36,10 @@ def is_configured() -> bool:
     return bool(settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY)
 
 
+def clamp_audio_duration(duration: int) -> int:
+    return max(1, min(21600, duration))
+
+
 def require_storage() -> None:
     if not is_configured():
         raise HTTPException(

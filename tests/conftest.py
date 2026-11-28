@@ -25,6 +25,14 @@ from main import app
 TEST_PASSWORD = "Password123!"
 
 
+def pytest_configure(config):
+    test_url = str(settings.DATABASE_URL_TEST).lower()
+    if "supabase" in test_url:
+        raise RuntimeError(
+            "DATABASE_URL_TEST must never point to Supabase"
+        )
+
+
 @pytest.fixture(scope="session")
 def test_engine():
     test_url = make_url(settings.DATABASE_URL_TEST)
